@@ -2,6 +2,10 @@
   "name": "package-changelog",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "build": "bun build ./index.ts --compile --outfile ./dist/clg"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/semver": "^7.5.8"
