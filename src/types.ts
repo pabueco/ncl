@@ -26,12 +26,14 @@ export type VersionParams =
       // `null` indicates the installed version should be used.
       from: {
         value: SemVer | null;
+        excluding?: boolean;
         raw?: string;
         range?: string | null;
       };
       // `null` indicates the latest version should be used.
       to: {
         value: SemVer | null;
+        excluding?: boolean;
         raw?: string;
         range?: string | null;
       };

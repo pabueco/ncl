@@ -4,7 +4,7 @@ import type { VersionParams } from "../types";
 export function maybeSemverRange(version: string): boolean {
   // Anything other than numbers, dots, letters, and hyphens is considered a range.
   const regex = new RegExp(/[^0-9a-zA-Z.-]/);
-  return regex.test(version);
+  return regex.test(version) || version.endsWith(".x");
 }
 
 export function coerceToSemVer(version: string | null): SemVer | null {
@@ -43,20 +43,27 @@ export function versionSatisfiesParams(
     });
   }
 
-  return (
-    (!params.from.value ||
-      (params.from.range
-        ? semver.satisfies(version, params.from.range, {
-            includePrerelease: true,
-          })
-        : semver.gte(version, params.from.value))) &&
-    (!params.to.value ||
-      (params.to.range
-        ? semver.satisfies(version, params.to.range, {
-            includePrerelease: true,
-          })
-        : semver.lte(version, params.to.value)))
-  );
+  const satisfiesFrom =
+    !params.from.value ||
+    (params.from.range
+      ? semver.satisfies(version, params.from.range, {
+          includePrerelease: true,
+        }) || semver.outside(version, params.from.range, ">")
+      : params.from.excluding
+      ? semver.gt(version, params.from.value)
+      : semver.gte(version, params.from.value));
+
+  const satisfiesTo =
+    !params.to.value ||
+    (params.to.range
+      ? semver.satisfies(version, params.to.range, {
+          includePrerelease: true,
+        }) || semver.outside(version, params.to.range, "<")
+      : params.to.excluding
+      ? semver.lt(version, params.to.value)
+      : semver.lte(version, params.to.value));
+
+  return satisfiesFrom && satisfiesTo;
 }
 
 export function parseVersionParams(versionString?: string): VersionParams {
@@ -111,15 +118,15 @@ export function parseVersionParams(versionString?: string): VersionParams {
     };
 
     // Check that the range are not mutually exclusive.
-    if (
-      params.from.range &&
-      params.to.range &&
-      !semver.intersects(params.from.range, params.to.range)
-    ) {
-      throw new Error(
-        `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
-      );
-    }
+    // if (
+    //   params.from.range &&
+    //   params.to.range &&
+    //   !semver.intersects(params.from.range, params.to.range)
+    // ) {
+    //   throw new Error(
+    //     `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
+    //   );
+    // }
 
     if (!params.from.value && !params.to.value) {
       throw new Error(

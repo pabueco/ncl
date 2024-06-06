@@ -1,5 +1,5 @@
 import { Argument, Command, Option } from "@commander-js/extra-typings";
-import { $ } from "bun";
+import { $, inspect } from "bun";
 import path from "node:path";
 import semver from "semver";
 import { marked, type Token } from "marked";
@@ -11,7 +11,7 @@ import {
   SYMBOLS,
   KEY_SEQUENCES,
 } from "./constants";
-import type { PackageManager, VersionParams, Release } from "./types";
+import type { VersionParams, Release } from "./types";
 import { debug } from "./utils";
 import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
 import { loadGitHubReleases } from "./lib/releases";
@@ -80,7 +80,7 @@ const basePath = options.project
   ? path.resolve(options.project)
   : process.cwd();
 
-debug(`Using base path: ${basePath}`);
+debug({ basePath });
 
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
@@ -102,9 +102,11 @@ if (versionParams.type === "range" && !versionParams.from.value) {
     packageManager,
     basePath
   );
+  // Exclude the release of the installed version.
+  versionParams.from.excluding = true;
 }
 
-debug("Parsed version params:", { versionParams });
+debug(inspect({ versionParams }, { depth: Infinity }));
 
 let repoUrl = await getPackageRepositoryUrl(pkg, packageManager, basePath);
 if (repoUrl && !repoUrl.includes("github.com")) {
@@ -236,12 +238,16 @@ async function navigateAndRender(mod = +1) {
 
   const datePart = currentRelease.date ? ` (${currentRelease.date})` : "";
 
+  const versionRangePart = `${releases[0].version} - ${
+    releases[releases.length - 1].version
+  }`;
+
   console.log(
-    `[${currentReleaseIndex + 1}/${releases.length}] Version: ${
-      currentRelease.version
-    }${datePart}   [${SYMBOLS.ArrowLeft}|a|k] Previous   [${
-      SYMBOLS.ArrowRight
-    }|d|j] Next   [q|Ctrl+C] Quit\n`
+    `${versionRangePart} | [${currentReleaseIndex + 1}/${
+      releases.length
+    }] Version: ${currentRelease.version}${datePart}   [${
+      SYMBOLS.ArrowLeft
+    }|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`
   );
 
   const string =
