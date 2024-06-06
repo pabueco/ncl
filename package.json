@@ -3,8 +3,8 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun --watch index.ts",
-    "build": "bun build ./index.ts --compile --outfile ./dist/clg"
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build ./src/index.ts --compile --outfile ./dist/clg"
   },
   "devDependencies": {
     "@types/bun": "latest",

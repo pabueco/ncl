@@ -1,79 +1,25 @@
 import { Argument, Command, Option } from "@commander-js/extra-typings";
-import { $, type Subprocess } from "bun";
+import { $ } from "bun";
 import path from "node:path";
-import semver, { type SemVer } from "semver";
+import semver, { SemVer } from "semver";
 import { marked, type Token } from "marked";
 // @ts-expect-error missing types
 import { markedTerminal } from "marked-terminal";
 import readline from "readline";
 import { format } from "date-fns";
-// import { select } from "@clack/prompts";
-
-const GITHUB_PAGE_LIMIT = 10;
-
-const SUPPORTED_PACKAGE_MANAGERS = [
-  "npm",
-  "yarn",
-  "pnpm",
-  "bun",
-  "composer",
-] as const;
-
-type PackageManager = (typeof SUPPORTED_PACKAGE_MANAGERS)[number];
-
-type BaseRelease = {
-  version: string;
-  content: string | Token[];
-  url?: string;
-  date?: string;
-};
-
-type ReleaseWithTokens = BaseRelease & {
-  content: Token[];
-};
-
-type ReleaseWithString = BaseRelease & {
-  content: string;
-};
-
-type Release = ReleaseWithTokens | ReleaseWithString;
-
-type VersionParams =
-  | {
-      // `null` indicates the installed version should be used.
-      from: {
-        value: SemVer | null;
-        raw?: string;
-        range?: string | null;
-      };
-      // `null` indicates the latest version should be used.
-      to: {
-        value: SemVer | null;
-        raw?: string;
-        range?: string | null;
-      };
-      type: "range";
-    }
-  | {
-      ref: string;
-      type: "ref";
-    };
-
-type RawGitHubRelease = {
-  tag_name: string;
-  name: string;
-  body: string;
-  html_url: string;
-  published_at: string;
-};
-
-const SYMBOLS = {
-  ArrowRight: "→",
-  ArrowLeft: "←",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
-  Enter: "↵",
-};
+import {
+  SUPPORTED_PACKAGE_MANAGERS,
+  GITHUB_PAGE_LIMIT,
+  SYMBOLS,
+  KEY_SEQUENCES,
+} from "./constants";
+import type {
+  PackageManager,
+  VersionParams,
+  ReleaseWithTokens,
+  RawGitHubRelease,
+  Release,
+} from "./types";
 
 async function detectPackageManager(
   basePath: string
@@ -151,9 +97,6 @@ const program = await new Command()
   .addOption(new Option("--debug", "Debug mode"))
   .addArgument(new Argument("<package>", "The package to inspect"))
   .addArgument(new Argument("[<version-range>]", "The version range to load"))
-  // .action(async (p) => {
-  //   console.log(`Inspecting package: ${p}`);
-  // })
   .parseAsync(process.argv);
 
 const options = program.opts();
@@ -162,7 +105,7 @@ const basePath = options.project
   ? path.resolve(options.project)
   : process.cwd();
 
-console.log(`Using base path: ${basePath}`);
+debug(`Using base path: ${basePath}`);
 
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
@@ -170,11 +113,11 @@ if (!packageManager) {
   throw new Error("Could not detect package manager");
 }
 
-const pkg = program.args[0];
+const [pkg, versionString] = program.processedArgs;
 
-console.log(`Using package manager: ${packageManager} for package ${pkg}`);
+debug(`Using package manager: ${packageManager} for package ${pkg}`);
 
-function parseVersionParams(versionString: string): VersionParams {
+function parseVersionParams(versionString?: string): VersionParams {
   if (!versionString) {
     return {
       from: {
@@ -258,7 +201,7 @@ function parseVersionParams(versionString: string): VersionParams {
 }
 
 // Parse version range argument.
-let versionParams: VersionParams = parseVersionParams(program.args[1]);
+let versionParams: VersionParams = parseVersionParams(versionString);
 
 // Load installed version if not provided.
 if (versionParams.type === "range" && !versionParams.from.value) {
@@ -268,7 +211,7 @@ if (versionParams.type === "range" && !versionParams.from.value) {
   );
 }
 
-console.log(versionParams);
+debug(versionParams);
 
 let repoUrl = await getPackageRepositoryUrl(pkg, packageManager);
 if (repoUrl && !repoUrl.includes("github.com")) {
@@ -278,7 +221,7 @@ if (repoUrl && !repoUrl.includes("github.com")) {
 }
 
 if (!repoUrl) {
-  console.log(`Could not detect repository URL, trying package name.`);
+  debug(`Could not detect repository URL, trying package name.`);
 
   const maybeUrl = `https://github.com/${pkg}`;
   const res = await fetch(maybeUrl);
@@ -290,7 +233,7 @@ if (!repoUrl) {
   }
 }
 
-console.log({ repoUrl });
+debug({ repoUrl });
 
 const isGithubCliInstalled = await $`gh --version`.quiet();
 if (isGithubCliInstalled.exitCode !== 0) {
@@ -298,7 +241,7 @@ if (isGithubCliInstalled.exitCode !== 0) {
 }
 
 const repoName = repoUrl.match(/github.com\/(.*)$/)?.[1];
-console.log({ repoName });
+debug({ repoName });
 
 let releases: Release[] = [];
 
@@ -308,7 +251,7 @@ const changelogUrl = `https://raw.githubusercontent.com/${repoName}/${branch}/${
 
 // Load releases from changelog file.
 if (!options.forceReleases) {
-  console.log(`Fetching changelog from: ${changelogUrl}`);
+  debug(`Fetching changelog from: ${changelogUrl}`);
   const changelogReleases = await loadAndParseChangelogFile(changelogUrl);
   if (changelogReleases) {
     releases = changelogReleases;
@@ -319,7 +262,7 @@ if (!options.forceReleases) {
 if (!releases.length) {
   console.warn(`Trying GitHub releases...`);
   releases = await loadGitHubReleases();
-  console.log(`Found ${releases.length} releases.`);
+  debug(`Found ${releases.length} releases.`);
 }
 
 // Default is by date (= order the releases appear in), so we only need to sort by version.
@@ -332,10 +275,6 @@ if (options.orderBy === "version") {
 // Default is ascending, so we only need to reverse if descending.
 if (options.order === "desc") {
   releases = releases.toReversed();
-}
-
-if (options.debug) {
-  process.exit();
 }
 
 if (!releases.length) {
@@ -404,7 +343,7 @@ async function loadGitHubReleases(): Promise<Release[]> {
   let hasFoundStart = false;
 
   while (page <= GITHUB_PAGE_LIMIT) {
-    console.log(`Fetching page ${page}...`);
+    debug(`Fetching page ${page}...`);
 
     // const releases =
     //   await $`gh release list --repo ${repoName} --json name,tagName,isLatest --exclude-pre-releases --exclude-drafts --order desc --limit 100`.quiet();
@@ -419,7 +358,7 @@ async function loadGitHubReleases(): Promise<Release[]> {
     const releasesJson: RawGitHubRelease[] = releases.json();
 
     if (!releasesJson.length) {
-      console.log(`No more releases found, stopping.`);
+      debug(`No more releases found, stopping.`);
       break;
     }
 
@@ -441,17 +380,12 @@ async function loadGitHubReleases(): Promise<Release[]> {
     // TODO: This is not working as expected when the last version is not satisfying the params, but the ones on the previous page are.
     // This can happen with pre-releases for example. Fetching everything is probably the best option.
     // if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
-    //   console.log(`Reached version ${lastVersion}, stopping.`);
+    //   debug(`Reached version ${lastVersion}, stopping.`);
     //   break;
     // }
 
     page++;
   }
-
-  console.log(
-    [rawReleases[80].tag_name, rawReleases[80].name],
-    findValidVersionInStrings([rawReleases[80].tag_name, rawReleases[80].name])
-  );
 
   return rawReleases
     .toReversed()
@@ -630,7 +564,10 @@ async function start(releases: Release[]) {
   let currentReleaseIndex = 0;
 
   const navigateAndRender = async (mod = +1) => {
-    console.clear();
+    // Prevent clear on first render in debug mode.
+    if (mod !== 0 || !options.debug) {
+      console.clear();
+    }
 
     currentReleaseIndex =
       (currentReleaseIndex + mod + releases.length) % releases.length;
@@ -650,15 +587,14 @@ async function start(releases: Release[]) {
     const string =
       typeof currentRelease.content === "string"
         ? await marked(currentRelease.content)
-        : // currentRelease.content
-          marked.parser(currentRelease.content);
+        : marked.parser(currentRelease.content);
 
     console.log(string);
   };
 
   process.stdin.on("keypress", async (str, key) => {
     // '\u0003' is Ctrl+C
-    if (key.name === "q" || key.sequence === "\u0003") {
+    if (key.name === "q" || key.sequence === KEY_SEQUENCES.CtrlC) {
       rl.close();
       process.exit();
     }
@@ -679,22 +615,6 @@ async function start(releases: Release[]) {
       case "a":
         navigateAndRender(-1);
         break;
-      // case "escape":
-      // scene = "select";
-      // console.clear();
-      // const projectType = await select({
-      //   message: "Pick a project type.",
-      //   options: [
-      //     { value: "ts", label: "TypeScript" },
-      //     { value: "js", label: "JavaScript" },
-      //     { value: "js", label: "JavaScript" },
-      //     { value: "js", label: "JavaScript" },
-      //     { value: "js", label: "JavaScript" },
-      //     { value: "coffee", label: "CoffeeScript", hint: "oh no" },
-      //   ],
-      // });
-      // scene = "view";
-      // navigateAndRender(0);
     }
   });
 
@@ -708,4 +628,10 @@ function maybeSemverRange(version: string): boolean {
   // Anything other than numbers, dots, letters, and hyphens is considered a range.
   const regex = new RegExp(/[^0-9a-zA-Z.-]/);
   return regex.test(version);
+}
+
+function debug(...args: any[]) {
+  if (options.debug) {
+    console.log(...args);
+  }
 }
