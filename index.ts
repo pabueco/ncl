@@ -191,6 +191,20 @@ function parseVersionParams(versionString: string): VersionParams {
   if (rangeSeperatorRegex.test(versionString)) {
     const [from, to] = versionString.split(rangeSeperatorRegex);
 
+    const fromCoerced = semver.coerce(from);
+    if (from && !fromCoerced) {
+      throw new Error(
+        `Invalid version range: ${versionString}. From is invalid.`
+      );
+    }
+
+    const toCoerced = semver.coerce(to);
+    if (to && !toCoerced) {
+      throw new Error(
+        `Invalid version range: ${versionString}. To is invalid.`
+      );
+    }
+
     const params: VersionParams = {
       from: {
         value: semver.coerce(from),
@@ -213,6 +227,12 @@ function parseVersionParams(versionString: string): VersionParams {
     ) {
       throw new Error(
         `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
+      );
+    }
+
+    if (!params.from.value && !params.to.value) {
+      throw new Error(
+        `Invalid version range: ${versionString}. Both from and to are invalid.`
       );
     }
 
