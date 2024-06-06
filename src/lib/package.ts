@@ -44,7 +44,8 @@ export async function getInstalledPackageVersion(
         return await $`pnpm info ${pkg} version`.cwd(basePath).text();
       case "bun": {
         const list = await $`bun pm ls`.cwd(basePath).text();
-        const match = list.match(new RegExp(`${pkg}@(.*)`));
+        // Must start with a space to avoid matching another package which ends with the same name.
+        const match = list.match(new RegExp(` ${pkg}@(.*)`));
         return match?.[1] || null;
       }
       case "composer": {
