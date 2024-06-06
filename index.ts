@@ -9,6 +9,8 @@ import readline from "readline";
 import { format } from "date-fns";
 // import { select } from "@clack/prompts";
 
+const GITHUB_PAGE_LIMIT = 10;
+
 const SUPPORTED_PACKAGE_MANAGERS = [
   "npm",
   "yarn",
@@ -189,16 +191,20 @@ function parseVersionParams(versionString: string): VersionParams {
 
   // Range
   if (rangeSeperatorRegex.test(versionString)) {
-    const [from, to] = versionString.split(rangeSeperatorRegex);
+    const [from, to, ...rest] = versionString.split(rangeSeperatorRegex);
 
-    const fromCoerced = semver.coerce(from);
+    if (rest.length) {
+      throw new Error(`Invalid version range: ${versionString}`);
+    }
+
+    const fromCoerced = coerceToSemVer(from);
     if (from && !fromCoerced) {
       throw new Error(
         `Invalid version range: ${versionString}. From is invalid.`
       );
     }
 
-    const toCoerced = semver.coerce(to);
+    const toCoerced = coerceToSemVer(to);
     if (to && !toCoerced) {
       throw new Error(
         `Invalid version range: ${versionString}. To is invalid.`
@@ -207,12 +213,12 @@ function parseVersionParams(versionString: string): VersionParams {
 
     const params: VersionParams = {
       from: {
-        value: semver.coerce(from),
+        value: coerceToSemVer(from),
         raw: from,
         range: maybeSemverRange(from) ? semver.validRange(from) : null,
       },
       to: {
-        value: semver.coerce(to),
+        value: coerceToSemVer(to),
         raw: to,
         range: maybeSemverRange(to) ? semver.validRange(to) : null,
       },
@@ -359,7 +365,7 @@ async function parseReleasesFromChangelog(source: string): Promise<Release[]> {
   for (const token of tokens) {
     if (token.type === "heading" && token.depth === 2) {
       const text = token.text.trim();
-      const version = semver.coerce(text);
+      const version = coerceToSemVer(text);
 
       // If we can't find a version, treat it like any other token.
       if (!version) {
@@ -397,7 +403,7 @@ async function loadGitHubReleases(): Promise<Release[]> {
   let page = 1;
   let hasFoundStart = false;
 
-  while (true) {
+  while (page <= GITHUB_PAGE_LIMIT) {
     console.log(`Fetching page ${page}...`);
 
     // const releases =
@@ -432,13 +438,20 @@ async function loadGitHubReleases(): Promise<Release[]> {
       lastRelease.name,
     ]);
 
-    if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
-      console.log(`Reached version ${lastVersion}, stopping.`);
-      break;
-    }
+    // TODO: This is not working as expected when the last version is not satisfying the params, but the ones on the previous page are.
+    // This can happen with pre-releases for example. Fetching everything is probably the best option.
+    // if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
+    //   console.log(`Reached version ${lastVersion}, stopping.`);
+    //   break;
+    // }
 
     page++;
   }
+
+  console.log(
+    [rawReleases[80].tag_name, rawReleases[80].name],
+    findValidVersionInStrings([rawReleases[80].tag_name, rawReleases[80].name])
+  );
 
   return rawReleases
     .toReversed()
@@ -481,7 +494,7 @@ async function getInstalledPackageVersion(
     }
   })();
 
-  return semver.coerce(version);
+  return coerceToSemVer(version);
 }
 
 async function getPackageRepositoryUrl(
@@ -530,24 +543,30 @@ function versionSatisfiesParams(
   }
 
   if (params.type === "ref") {
-    return semver.satisfies(version, params.ref);
+    return semver.satisfies(version, params.ref, {
+      includePrerelease: true,
+    });
   }
 
   return (
     (!params.from.value ||
       (params.from.range
-        ? semver.satisfies(version, params.from.range)
+        ? semver.satisfies(version, params.from.range, {
+            includePrerelease: true,
+          })
         : semver.gte(version, params.from.value))) &&
     (!params.to.value ||
       (params.to.range
-        ? semver.satisfies(version, params.to.range)
+        ? semver.satisfies(version, params.to.range, {
+            includePrerelease: true,
+          })
         : semver.lte(version, params.to.value)))
   );
 }
 
 function findValidVersionInStrings(strings: string[]): SemVer | null {
   for (const string of strings) {
-    const version = semver.coerce(string);
+    const version = coerceToSemVer(string);
 
     if (version) {
       return version;
@@ -555,6 +574,16 @@ function findValidVersionInStrings(strings: string[]): SemVer | null {
   }
 
   return null;
+}
+
+function coerceToSemVer(version: string | null): SemVer | null {
+  if (!version) {
+    return null;
+  }
+
+  return semver.coerce(version, {
+    includePrerelease: true,
+  });
 }
 
 async function start(releases: Release[]) {
