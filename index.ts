@@ -1,7 +1,7 @@
 import { Argument, Command, Option } from "@commander-js/extra-typings";
 import { $, type Subprocess } from "bun";
 import path from "node:path";
-import semver from "semver";
+import semver, { type SemVer } from "semver";
 import { marked, type Token } from "marked";
 // @ts-expect-error missing types
 import { markedTerminal } from "marked-terminal";
@@ -35,6 +35,27 @@ type ReleaseWithString = BaseRelease & {
 };
 
 type Release = ReleaseWithTokens | ReleaseWithString;
+
+type VersionParams =
+  | {
+      // `null` indicates the installed version should be used.
+      from: SemVer | null;
+      // `null` indicates the latest version should be used.
+      to: SemVer | null;
+      type: "range";
+    }
+  | {
+      ref: string;
+      type: "ref";
+    };
+
+type RawGitHubRelease = {
+  tag_name: string;
+  name: string;
+  body: string;
+  html_url: string;
+  published_at: string;
+};
 
 const SYMBOLS = {
   ArrowRight: "→",
@@ -85,21 +106,15 @@ const program = await new Command()
   )
   .addOption(
     new Option(
-      "-l, --list",
-      "Render all releases in a list instead of interactive mode"
+      "-s, --static",
+      "Print all releases in a static list instead of interactive mode"
     )
   )
   .addOption(
     new Option(
-      "-from, --from-version <from-version>",
-      "Include releases starting from this version. Defaults to the installed version of the package."
+      "-r, --force-releases",
+      "Force the use of GitHub releases instead of parsing the changelog file"
     )
-  )
-  .addOption(
-    new Option(
-      "-to, --to-version <to-version>",
-      "Include releases up to this version."
-    ).default("latest")
   )
   .addOption(
     new Option(
@@ -113,7 +128,9 @@ const program = await new Command()
       "The filename of the changelog file"
     ).default("CHANGELOG.md")
   )
+  .addOption(new Option("-d, --debug", "Debug mode"))
   .addArgument(new Argument("<package>", "The package to inspect"))
+  .addArgument(new Argument("[<version-range>]", "The version range to load"))
   // .action(async (p) => {
   //   console.log(`Inspecting package: ${p}`);
   // })
@@ -137,16 +154,48 @@ const pkg = program.args[0];
 
 console.log(`Using package manager: ${packageManager} for package ${pkg}`);
 
-let fromVersion = options.fromVersion
-  ? semver.coerce(options.fromVersion)
-  : await getInstalledPackageVersion(pkg, packageManager);
+function parseVersionParams(versionString: string): VersionParams {
+  if (!versionString) {
+    return {
+      from: null,
+      to: null,
+      type: "range",
+    };
+  }
 
-let toVersion = options.toVersion ? semver.coerce(options.toVersion) : null;
+  const rangeSeperatorRegex = new RegExp(/\.{2,4}/);
 
-console.log({
-  fromVersion: fromVersion?.toString(),
-  toVersion: toVersion?.toString(),
-});
+  // Range
+  if (rangeSeperatorRegex.test(versionString)) {
+    const [from, to] = versionString.split(rangeSeperatorRegex);
+    return {
+      from: semver.coerce(from),
+      to: semver.coerce(to),
+      type: "range",
+    };
+  }
+  // Single reference, like: 1.x, 1.2, 1.2.x
+  else {
+    if (!semver.validRange(versionString)) {
+      throw new Error(`Invalid version range: ${versionString}`);
+    }
+
+    return {
+      ref: versionString,
+      type: "ref",
+    };
+  }
+}
+
+// Parse version range argument.
+let versionParams: VersionParams = parseVersionParams(program.args[1]);
+
+// Load installed version if not provided.
+if (versionParams.type === "range" && !versionParams.from) {
+  versionParams.from = await getInstalledPackageVersion(pkg, packageManager);
+}
+
+console.log(versionParams);
 
 let repoUrl = await getPackageRepositoryUrl(pkg, packageManager);
 if (repoUrl && !repoUrl.includes("github.com")) {
@@ -178,30 +227,48 @@ if (isGithubCliInstalled.exitCode !== 0) {
 const repoName = repoUrl.match(/github.com\/(.*)$/)?.[1];
 console.log({ repoName });
 
+let releases: Release[] = [];
+
 const branch = options.branch;
 const file = options.file;
 const changelogUrl = `https://raw.githubusercontent.com/${repoName}/${branch}/${file}`;
 
-console.log(`Fetching changelog from: ${changelogUrl}`);
-
-const res = await fetch(changelogUrl);
-
-let releases: Release[] = [];
-
-if (res.ok) {
-  const changelogSource = await res.text();
-  releases = await parseReleasesFromChangelog(changelogSource);
+// Load releases from changelog file.
+if (!options.forceReleases) {
+  console.log(`Fetching changelog from: ${changelogUrl}`);
+  const changelogReleases = await loadAndParseChangelogFile(changelogUrl);
+  if (changelogReleases) {
+    releases = changelogReleases;
+  }
 }
 
 // Either the changelog file does not exist it did not contain any releases.
 if (!releases.length) {
-  console.warn(
-    `Could not fetch changelog from ${changelogUrl}. Trying GitHub releases...`
-  );
+  console.warn(`Trying GitHub releases...`);
   releases = await loadGitHubReleases();
 }
 
+if (options.debug) {
+  process.exit();
+}
+
+if (!releases.length) {
+  throw new Error("No releases found");
+}
+
 await start(releases);
+
+async function loadAndParseChangelogFile(
+  url: string
+): Promise<Release[] | null> {
+  const res = await fetch(changelogUrl);
+  if (!res.ok) {
+    return null;
+  }
+
+  const changelogSource = await res.text();
+  return await parseReleasesFromChangelog(changelogSource);
+}
 
 async function parseReleasesFromChangelog(source: string): Promise<Release[]> {
   const tokens = marked.lexer(source);
@@ -224,12 +291,7 @@ async function parseReleasesFromChangelog(source: string): Promise<Release[]> {
         releases.unshift(currentRelease);
       }
 
-      if (fromVersion && !semver.gte(version, fromVersion)) {
-        currentRelease = null;
-        continue;
-      }
-
-      if (toVersion && !semver.lte(version, toVersion)) {
+      if (!versionSatisfiesParams(version, versionParams)) {
         currentRelease = null;
         continue;
       }
@@ -253,6 +315,7 @@ async function parseReleasesFromChangelog(source: string): Promise<Release[]> {
 async function loadGitHubReleases(): Promise<Release[]> {
   const rawReleases: any[] = [];
   let page = 1;
+  let hasFoundStart = false;
 
   while (true) {
     console.log(`Fetching page ${page}...`);
@@ -267,20 +330,29 @@ async function loadGitHubReleases(): Promise<Release[]> {
       throw new Error("Could not fetch releases" + releases.stderr.toString());
     }
 
-    const releasesJson = releases.json();
+    const releasesJson: RawGitHubRelease[] = releases.json();
 
     if (!releasesJson.length) {
       console.log(`No more releases found, stopping.`);
       break;
     }
 
+    if (!hasFoundStart) {
+      hasFoundStart = releasesJson.some((r) => {
+        const version = findValidVersionInStrings([r.tag_name, r.name]);
+        return versionSatisfiesParams(version, versionParams);
+      });
+    }
+
     rawReleases.push(...releasesJson);
 
-    const lastVersion = semver.coerce(
-      releasesJson[releasesJson.length - 1].tag_name
-    );
+    const lastRelease = releasesJson[releasesJson.length - 1];
+    const lastVersion = findValidVersionInStrings([
+      lastRelease.tag_name,
+      lastRelease.name,
+    ]);
 
-    if (fromVersion && lastVersion && semver.lt(lastVersion, fromVersion)) {
+    if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
       console.log(`Reached version ${lastVersion}, stopping.`);
       break;
     }
@@ -291,26 +363,21 @@ async function loadGitHubReleases(): Promise<Release[]> {
   return rawReleases
     .toReversed()
     .map((r) => ({
-      version: (
-        semver.coerce(r.tag_name) ?? semver.coerce(r.name)
-      )?.toString()!,
+      version:
+        findValidVersionInStrings([r.tag_name, r.name])?.toString() || "",
       content: r.body as string,
       url: r.html_url,
       date: format(new Date(r.published_at), "yyyy-MM-dd"),
     }))
     .filter((r) => {
-      return (
-        r.version &&
-        (!fromVersion || semver.gte(r.version, fromVersion)) &&
-        (!toVersion || semver.lte(r.version, toVersion))
-      );
+      return versionSatisfiesParams(r.version, versionParams);
     });
 }
 
 async function getInstalledPackageVersion(
   pkg: string,
   manager: PackageManager
-): Promise<string | null> {
+): Promise<SemVer | null> {
   const version = await (async () => {
     switch (manager) {
       case "npm":
@@ -334,11 +401,7 @@ async function getInstalledPackageVersion(
     }
   })();
 
-  // if (!version) {
-  //   throw new Error("Could not detect installed version");
-  // }
-
-  return version;
+  return semver.coerce(version);
 }
 
 async function getPackageRepositoryUrl(
@@ -378,6 +441,36 @@ async function getPackageRepositoryUrl(
     .replace(/\.git$/, "");
 }
 
+function versionSatisfiesParams(
+  version: SemVer | string | null,
+  params: VersionParams
+): boolean {
+  if (!version) {
+    return false;
+  }
+
+  if (params.type === "ref") {
+    return semver.satisfies(version, params.ref);
+  }
+
+  return (
+    (!params.from || semver.gte(version, params.from)) &&
+    (!params.to || semver.lte(version, params.to))
+  );
+}
+
+function findValidVersionInStrings(strings: string[]): SemVer | null {
+  for (const string of strings) {
+    const version = semver.coerce(string);
+
+    if (version) {
+      return version;
+    }
+  }
+
+  return null;
+}
+
 async function start(releases: Release[]) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -391,7 +484,7 @@ async function start(releases: Release[]) {
     })
   );
 
-  if (options.list) {
+  if (options.static) {
     const isTokens = typeof releases[0].content !== "string";
 
     const string = isTokens
