@@ -100,7 +100,7 @@ const program = await new Command()
   )
   .addOption(
     new Option(
-      "-pm, --package-manager <package-manager>",
+      "-m, --package-manager <package-manager>",
       "The package manager to use for detecting the installed version and other info"
     ).choices(SUPPORTED_PACKAGE_MANAGERS)
   )
@@ -128,7 +128,20 @@ const program = await new Command()
       "The filename of the changelog file"
     ).default("CHANGELOG.md")
   )
-  .addOption(new Option("-d, --debug", "Debug mode"))
+  .addOption(
+    new Option("-o, --order-by <field>", "The field to order releases by")
+      .default("date")
+      .choices(["date", "version"])
+  )
+  .addOption(
+    new Option(
+      "-d, --order-direction <dir>",
+      "The direction to order releases in"
+    )
+      .default("asc")
+      .choices(["asc", "desc"])
+  )
+  .addOption(new Option("--debug", "Debug mode"))
   .addArgument(new Argument("<package>", "The package to inspect"))
   .addArgument(new Argument("[<version-range>]", "The version range to load"))
   // .action(async (p) => {
@@ -246,6 +259,18 @@ if (!options.forceReleases) {
 if (!releases.length) {
   console.warn(`Trying GitHub releases...`);
   releases = await loadGitHubReleases();
+}
+
+// Default is by date (= order the releases appear in), so we only need to sort by version.
+if (options.orderBy === "version") {
+  releases = releases.toSorted((a, b) => {
+    return semver.compare(a.version, b.version);
+  });
+}
+
+// Default is ascending, so we only need to reverse if descending.
+if (options.orderDirection === "desc") {
+  releases = releases.toReversed();
 }
 
 if (options.debug) {
