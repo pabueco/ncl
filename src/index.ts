@@ -1,51 +1,26 @@
 import { Argument, Command, Option } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import path from "node:path";
-import semver, { SemVer } from "semver";
+import semver from "semver";
 import { marked, type Token } from "marked";
 // @ts-expect-error missing types
 import { markedTerminal } from "marked-terminal";
 import readline from "readline";
-import { format } from "date-fns";
 import {
   SUPPORTED_PACKAGE_MANAGERS,
-  GITHUB_PAGE_LIMIT,
   SYMBOLS,
   KEY_SEQUENCES,
 } from "./constants";
-import type {
-  PackageManager,
-  VersionParams,
-  ReleaseWithTokens,
-  RawGitHubRelease,
-  Release,
-} from "./types";
-
-async function detectPackageManager(
-  basePath: string
-): Promise<PackageManager | null> {
-  if (await Bun.file(`${basePath}/yarn.lock`).exists()) {
-    return "yarn";
-  }
-
-  if (await Bun.file(`${basePath}/package-lock.json`).exists()) {
-    return "npm";
-  }
-
-  if (await Bun.file(`${basePath}/pnpm-lock.yaml`).exists()) {
-    return "pnpm";
-  }
-
-  if (await Bun.file(`${basePath}/bun.lockb`).exists()) {
-    return "bun";
-  }
-
-  if (await Bun.file(`${basePath}/composer.json`).exists()) {
-    return "composer";
-  }
-
-  return null;
-}
+import type { PackageManager, VersionParams, Release } from "./types";
+import { debug } from "./utils";
+import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
+import { loadGitHubReleases } from "./lib/releases";
+import {
+  detectPackageManager,
+  getInstalledPackageVersion,
+  getPackageRepositoryUrl,
+} from "./lib/package";
+import { parseVersionParams } from "./lib/version";
 
 const program = await new Command()
   .addOption(
@@ -117,89 +92,6 @@ const [pkg, versionString] = program.processedArgs;
 
 debug(`Using package manager: ${packageManager} for package ${pkg}`);
 
-function parseVersionParams(versionString?: string): VersionParams {
-  if (!versionString) {
-    return {
-      from: {
-        value: null,
-      },
-      to: {
-        value: null,
-      },
-      type: "range",
-    };
-  }
-
-  const rangeSeperatorRegex = new RegExp(/\.{2,4}/);
-
-  // Range
-  if (rangeSeperatorRegex.test(versionString)) {
-    const [from, to, ...rest] = versionString.split(rangeSeperatorRegex);
-
-    if (rest.length) {
-      throw new Error(`Invalid version range: ${versionString}`);
-    }
-
-    const fromCoerced = coerceToSemVer(from);
-    if (from && !fromCoerced) {
-      throw new Error(
-        `Invalid version range: ${versionString}. From is invalid.`
-      );
-    }
-
-    const toCoerced = coerceToSemVer(to);
-    if (to && !toCoerced) {
-      throw new Error(
-        `Invalid version range: ${versionString}. To is invalid.`
-      );
-    }
-
-    const params: VersionParams = {
-      from: {
-        value: coerceToSemVer(from),
-        raw: from,
-        range: maybeSemverRange(from) ? semver.validRange(from) : null,
-      },
-      to: {
-        value: coerceToSemVer(to),
-        raw: to,
-        range: maybeSemverRange(to) ? semver.validRange(to) : null,
-      },
-      type: "range",
-    };
-
-    // Check that the range are not mutually exclusive.
-    if (
-      params.from.range &&
-      params.to.range &&
-      !semver.intersects(params.from.range, params.to.range)
-    ) {
-      throw new Error(
-        `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
-      );
-    }
-
-    if (!params.from.value && !params.to.value) {
-      throw new Error(
-        `Invalid version range: ${versionString}. Both from and to are invalid.`
-      );
-    }
-
-    return params;
-  }
-  // Single reference, like: 1.x, 1.2, 1.2.x
-  else {
-    if (!semver.validRange(versionString)) {
-      throw new Error(`Invalid version range: ${versionString}`);
-    }
-
-    return {
-      ref: versionString,
-      type: "ref",
-    };
-  }
-}
-
 // Parse version range argument.
 let versionParams: VersionParams = parseVersionParams(versionString);
 
@@ -207,13 +99,14 @@ let versionParams: VersionParams = parseVersionParams(versionString);
 if (versionParams.type === "range" && !versionParams.from.value) {
   versionParams.from.value = await getInstalledPackageVersion(
     pkg,
-    packageManager
+    packageManager,
+    basePath
   );
 }
 
-debug(versionParams);
+debug("Parsed version params:", { versionParams });
 
-let repoUrl = await getPackageRepositoryUrl(pkg, packageManager);
+let repoUrl = await getPackageRepositoryUrl(pkg, packageManager, basePath);
 if (repoUrl && !repoUrl.includes("github.com")) {
   throw new Error(
     `Unsupported repository URL: ${repoUrl}. Only GitHub is currently supported.`
@@ -243,16 +136,23 @@ if (isGithubCliInstalled.exitCode !== 0) {
 const repoName = repoUrl.match(/github.com\/(.*)$/)?.[1];
 debug({ repoName });
 
+if (!repoName) {
+  throw new Error("Could not find repository name");
+}
+
 let releases: Release[] = [];
 
-const branch = options.branch;
-const file = options.file;
-const changelogUrl = `https://raw.githubusercontent.com/${repoName}/${branch}/${file}`;
+const changelogUrl = `https://raw.githubusercontent.com/${repoName}/${options.branch}/${options.file}`;
 
 // Load releases from changelog file.
 if (!options.forceReleases) {
   debug(`Fetching changelog from: ${changelogUrl}`);
-  const changelogReleases = await loadAndParseChangelogFile(changelogUrl);
+  const content = await loadChangelogFile(changelogUrl);
+  const changelogReleases = await parseReleasesFromChangelog(
+    content,
+    versionParams
+  );
+
   if (changelogReleases) {
     releases = changelogReleases;
   }
@@ -261,7 +161,7 @@ if (!options.forceReleases) {
 // Either the changelog file does not exist it did not contain any releases.
 if (!releases.length) {
   console.warn(`Trying GitHub releases...`);
-  releases = await loadGitHubReleases();
+  releases = await loadGitHubReleases(repoName, versionParams);
   debug(`Found ${releases.length} releases.`);
 }
 
@@ -281,357 +181,104 @@ if (!releases.length) {
   throw new Error("No releases found");
 }
 
-await start(releases);
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
-async function loadAndParseChangelogFile(
-  url: string
-): Promise<Release[] | null> {
-  const res = await fetch(changelogUrl);
-  if (!res.ok) {
-    return null;
-  }
+marked.use(
+  markedTerminal({
+    // reflowText: true,
+    // width: 80,
+  })
+);
 
-  const changelogSource = await res.text();
-  return await parseReleasesFromChangelog(changelogSource);
-}
+if (options.static) {
+  const isTokens = typeof releases[0].content !== "string";
 
-async function parseReleasesFromChangelog(source: string): Promise<Release[]> {
-  const tokens = marked.lexer(source);
+  const string = isTokens
+    ? marked.parser(releases.flatMap((r) => r.content as Token[]))
+    : await marked(
+        releases
+          .map((r) => {
+            let title = r.version;
 
-  const releases: ReleaseWithTokens[] = [];
+            if (r.date) {
+              title += ` (${r.date})`;
+            }
 
-  let currentRelease: ReleaseWithTokens | null = null;
-  for (const token of tokens) {
-    if (token.type === "heading" && token.depth === 2) {
-      const text = token.text.trim();
-      const version = coerceToSemVer(text);
+            if (r.url) {
+              title = `[${title}](${r.url})`;
+            }
 
-      // If we can't find a version, treat it like any other token.
-      if (!version) {
-        currentRelease?.content.push(token);
-        continue;
-      }
-
-      if (currentRelease) {
-        releases.unshift(currentRelease);
-      }
-
-      if (!versionSatisfiesParams(version, versionParams)) {
-        currentRelease = null;
-        continue;
-      }
-
-      currentRelease = {
-        version: version.toString(),
-        content: [],
-      };
-    }
-
-    currentRelease?.content.push(token);
-  }
-
-  if (currentRelease && currentRelease.content.length > 0) {
-    releases.unshift(currentRelease);
-  }
-
-  return releases;
-}
-
-async function loadGitHubReleases(): Promise<Release[]> {
-  const rawReleases: any[] = [];
-  let page = 1;
-  let hasFoundStart = false;
-
-  while (page <= GITHUB_PAGE_LIMIT) {
-    debug(`Fetching page ${page}...`);
-
-    // const releases =
-    //   await $`gh release list --repo ${repoName} --json name,tagName,isLatest --exclude-pre-releases --exclude-drafts --order desc --limit 100`.quiet();
-    // We have to use the API because the CLI does not support paging/offsets.
-    const releases =
-      await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${repoName}/releases -X GET -f per_page=100 -f page=${page}`.quiet();
-
-    if (releases.exitCode !== 0) {
-      throw new Error("Could not fetch releases" + releases.stderr.toString());
-    }
-
-    const releasesJson: RawGitHubRelease[] = releases.json();
-
-    if (!releasesJson.length) {
-      debug(`No more releases found, stopping.`);
-      break;
-    }
-
-    if (!hasFoundStart) {
-      hasFoundStart = releasesJson.some((r) => {
-        const version = findValidVersionInStrings([r.tag_name, r.name]);
-        return versionSatisfiesParams(version, versionParams);
-      });
-    }
-
-    rawReleases.push(...releasesJson);
-
-    const lastRelease = releasesJson[releasesJson.length - 1];
-    const lastVersion = findValidVersionInStrings([
-      lastRelease.tag_name,
-      lastRelease.name,
-    ]);
-
-    // TODO: This is not working as expected when the last version is not satisfying the params, but the ones on the previous page are.
-    // This can happen with pre-releases for example. Fetching everything is probably the best option.
-    // if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
-    //   debug(`Reached version ${lastVersion}, stopping.`);
-    //   break;
-    // }
-
-    page++;
-  }
-
-  return rawReleases
-    .toReversed()
-    .map((r) => ({
-      version:
-        findValidVersionInStrings([r.tag_name, r.name])?.toString() || "",
-      content: r.body as string,
-      url: r.html_url,
-      date: format(new Date(r.published_at), "yyyy-MM-dd"),
-    }))
-    .filter((r) => {
-      return versionSatisfiesParams(r.version, versionParams);
-    });
-}
-
-async function getInstalledPackageVersion(
-  pkg: string,
-  manager: PackageManager
-): Promise<SemVer | null> {
-  const version = await (async () => {
-    switch (manager) {
-      case "npm":
-        return await $`npm info ${pkg} version`.cwd(basePath).text();
-      case "yarn":
-        return await $`yarn info ${pkg} version`.cwd(basePath).text();
-      case "pnpm":
-        return await $`pnpm info ${pkg} version`.cwd(basePath).text();
-      case "bun": {
-        const list = await $`bun pm ls`.cwd(basePath).text();
-        const match = list.match(new RegExp(`${pkg}@(.*)`));
-        return match?.[1] || null;
-      }
-      case "composer": {
-        const info = await $`composer show ${pkg} --no-ansi`
-          .cwd(basePath)
-          .text();
-        const match = info.match(/versions[ \t]+: \* (.*)/);
-        return match?.[1] || null;
-      }
-    }
-  })();
-
-  return coerceToSemVer(version);
-}
-
-async function getPackageRepositoryUrl(
-  pkg: string,
-  manager: PackageManager
-): Promise<string | null> {
-  let url = "";
-
-  try {
-    switch (manager) {
-      case "npm":
-      case "yarn":
-      case "pnpm":
-      case "bun":
-        url = await $`npm view ${pkg} repository.url`.cwd(basePath).text();
-        break;
-      case "composer": {
-        const info = await $`composer show ${pkg} --no-ansi`
-          .cwd(basePath)
-          .text();
-        const match = info.match(/source[ \t]+: \[git\] (.*) .*/);
-        url = match?.[1] || "";
-        break;
-      }
-    }
-  } catch (e) {
-    // console.error(e);
-    // We want to support getting changelogs without being in an actual project.
-  }
-
-  if (!url) return null;
-
-  // Remove git+ and .git from the URL
-  return url
-    .trim()
-    .replace(/git\+/, "")
-    .replace(/\.git$/, "");
-}
-
-function versionSatisfiesParams(
-  version: SemVer | string | null,
-  params: VersionParams
-): boolean {
-  if (!version) {
-    return false;
-  }
-
-  if (params.type === "ref") {
-    return semver.satisfies(version, params.ref, {
-      includePrerelease: true,
-    });
-  }
-
-  return (
-    (!params.from.value ||
-      (params.from.range
-        ? semver.satisfies(version, params.from.range, {
-            includePrerelease: true,
+            return [`# ${title}`, r.content].join("\n");
           })
-        : semver.gte(version, params.from.value))) &&
-    (!params.to.value ||
-      (params.to.range
-        ? semver.satisfies(version, params.to.range, {
-            includePrerelease: true,
-          })
-        : semver.lte(version, params.to.value)))
-  );
+          .join("\n\n")
+      );
+
+  console.log(string);
+
+  process.exit();
 }
 
-function findValidVersionInStrings(strings: string[]): SemVer | null {
-  for (const string of strings) {
-    const version = coerceToSemVer(string);
+let currentReleaseIndex = 0;
 
-    if (version) {
-      return version;
-    }
+async function navigateAndRender(mod = +1) {
+  // Prevent clear on first render in debug mode.
+  if (mod !== 0 || !options.debug) {
+    console.clear();
   }
 
-  return null;
-}
+  currentReleaseIndex =
+    (currentReleaseIndex + mod + releases.length) % releases.length;
 
-function coerceToSemVer(version: string | null): SemVer | null {
-  if (!version) {
-    return null;
-  }
+  const currentRelease = releases[currentReleaseIndex];
 
-  return semver.coerce(version, {
-    includePrerelease: true,
-  });
-}
+  const datePart = currentRelease.date ? ` (${currentRelease.date})` : "";
 
-async function start(releases: Release[]) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  marked.use(
-    markedTerminal({
-      // reflowText: true,
-      // width: 80,
-    })
+  console.log(
+    `[${currentReleaseIndex + 1}/${releases.length}] Version: ${
+      currentRelease.version
+    }${datePart}   [${SYMBOLS.ArrowLeft}|a|k] Previous   [${
+      SYMBOLS.ArrowRight
+    }|d|j] Next   [q|Ctrl+C] Quit\n`
   );
 
-  if (options.static) {
-    const isTokens = typeof releases[0].content !== "string";
+  const string =
+    typeof currentRelease.content === "string"
+      ? await marked(currentRelease.content)
+      : marked.parser(currentRelease.content);
 
-    const string = isTokens
-      ? marked.parser(releases.flatMap((r) => r.content as Token[]))
-      : await marked(
-          releases
-            .map((r) => {
-              let title = r.version;
+  console.log(string);
+}
 
-              if (r.date) {
-                title += ` (${r.date})`;
-              }
-
-              if (r.url) {
-                title = `[${title}](${r.url})`;
-              }
-
-              return [`# ${title}`, r.content].join("\n");
-            })
-            .join("\n\n")
-        );
-
-    console.log(string);
-
+process.stdin.on("keypress", async (str, key) => {
+  // '\u0003' is Ctrl+C
+  if (key.name === "q" || key.sequence === KEY_SEQUENCES.CtrlC) {
+    rl.close();
     process.exit();
   }
 
-  let currentReleaseIndex = 0;
-
-  const navigateAndRender = async (mod = +1) => {
-    // Prevent clear on first render in debug mode.
-    if (mod !== 0 || !options.debug) {
-      console.clear();
-    }
-
-    currentReleaseIndex =
-      (currentReleaseIndex + mod + releases.length) % releases.length;
-
-    const currentRelease = releases[currentReleaseIndex];
-
-    const datePart = currentRelease.date ? ` (${currentRelease.date})` : "";
-
-    console.log(
-      `[${currentReleaseIndex + 1}/${releases.length}] Version: ${
-        currentRelease.version
-      }${datePart}   [${SYMBOLS.ArrowLeft}|a|k] Previous   [${
-        SYMBOLS.ArrowRight
-      }|d|j] Next   [q|Ctrl+C] Quit\n`
-    );
-
-    const string =
-      typeof currentRelease.content === "string"
-        ? await marked(currentRelease.content)
-        : marked.parser(currentRelease.content);
-
-    console.log(string);
-  };
-
-  process.stdin.on("keypress", async (str, key) => {
-    // '\u0003' is Ctrl+C
-    if (key.name === "q" || key.sequence === KEY_SEQUENCES.CtrlC) {
-      rl.close();
-      process.exit();
-    }
-
-    switch (key.name) {
-      case "right":
-      case "space":
-      // case "down":
-      case "return":
-      case "tab":
-      case "j":
-      case "d":
-        navigateAndRender(+1);
-        break;
-      case "left":
-      // case "up":
-      case "k":
-      case "a":
-        navigateAndRender(-1);
-        break;
-    }
-  });
-
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-
-  navigateAndRender(0);
-}
-
-function maybeSemverRange(version: string): boolean {
-  // Anything other than numbers, dots, letters, and hyphens is considered a range.
-  const regex = new RegExp(/[^0-9a-zA-Z.-]/);
-  return regex.test(version);
-}
-
-function debug(...args: any[]) {
-  if (options.debug) {
-    console.log(...args);
+  switch (key.name) {
+    case "right":
+    case "space":
+    // case "down":
+    case "return":
+    case "tab":
+    case "j":
+    case "d":
+      navigateAndRender(+1);
+      break;
+    case "left":
+    // case "up":
+    case "k":
+    case "a":
+      navigateAndRender(-1);
+      break;
   }
-}
+});
+
+process.stdin.setRawMode(true);
+process.stdin.resume();
+
+navigateAndRender(0);
