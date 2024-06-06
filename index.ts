@@ -134,10 +134,7 @@ const program = await new Command()
       .choices(["date", "version"])
   )
   .addOption(
-    new Option(
-      "-d, --order-direction <dir>",
-      "The direction to order releases in"
-    )
+    new Option("-d, --order <dir>", "The direction to order releases in")
       .default("asc")
       .choices(["asc", "desc"])
   )
@@ -269,7 +266,7 @@ if (options.orderBy === "version") {
 }
 
 // Default is ascending, so we only need to reverse if descending.
-if (options.orderDirection === "desc") {
+if (options.order === "desc") {
   releases = releases.toReversed();
 }
 
