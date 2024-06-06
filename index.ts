@@ -191,23 +191,32 @@ function parseVersionParams(versionString: string): VersionParams {
   if (rangeSeperatorRegex.test(versionString)) {
     const [from, to] = versionString.split(rangeSeperatorRegex);
 
-    const fromRange = semver.validRange(from);
-    const toRange = semver.validRange(to);
-
-    return {
+    const params: VersionParams = {
       from: {
         value: semver.coerce(from),
         raw: from,
-        // `*` means the version is not a range, but a single version.
-        range: fromRange === "*" ? null : fromRange,
+        range: maybeSemverRange(from) ? semver.validRange(from) : null,
       },
       to: {
         value: semver.coerce(to),
         raw: to,
-        range: toRange === "*" ? null : toRange,
+        range: maybeSemverRange(to) ? semver.validRange(to) : null,
       },
       type: "range",
     };
+
+    // Check that the range are not mutually exclusive.
+    if (
+      params.from.range &&
+      params.to.range &&
+      !semver.intersects(params.from.range, params.to.range)
+    ) {
+      throw new Error(
+        `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
+      );
+    }
+
+    return params;
   }
   // Single reference, like: 1.x, 1.2, 1.2.x
   else {
@@ -284,6 +293,7 @@ if (!options.forceReleases) {
 if (!releases.length) {
   console.warn(`Trying GitHub releases...`);
   releases = await loadGitHubReleases();
+  console.log(`Found ${releases.length} releases.`);
 }
 
 // Default is by date (= order the releases appear in), so we only need to sort by version.
@@ -643,4 +653,10 @@ async function start(releases: Release[]) {
   process.stdin.resume();
 
   navigateAndRender(0);
+}
+
+function maybeSemverRange(version: string): boolean {
+  // Anything other than numbers, dots, letters, and hyphens is considered a range.
+  const regex = new RegExp(/[^0-9a-zA-Z.-]/);
+  return regex.test(version);
 }
