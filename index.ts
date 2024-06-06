@@ -39,9 +39,17 @@ type Release = ReleaseWithTokens | ReleaseWithString;
 type VersionParams =
   | {
       // `null` indicates the installed version should be used.
-      from: SemVer | null;
+      from: {
+        value: SemVer | null;
+        raw?: string;
+        range?: string | null;
+      };
       // `null` indicates the latest version should be used.
-      to: SemVer | null;
+      to: {
+        value: SemVer | null;
+        raw?: string;
+        range?: string | null;
+      };
       type: "range";
     }
   | {
@@ -167,8 +175,12 @@ console.log(`Using package manager: ${packageManager} for package ${pkg}`);
 function parseVersionParams(versionString: string): VersionParams {
   if (!versionString) {
     return {
-      from: null,
-      to: null,
+      from: {
+        value: null,
+      },
+      to: {
+        value: null,
+      },
       type: "range",
     };
   }
@@ -178,9 +190,22 @@ function parseVersionParams(versionString: string): VersionParams {
   // Range
   if (rangeSeperatorRegex.test(versionString)) {
     const [from, to] = versionString.split(rangeSeperatorRegex);
+
+    const fromRange = semver.validRange(from);
+    const toRange = semver.validRange(to);
+
     return {
-      from: semver.coerce(from),
-      to: semver.coerce(to),
+      from: {
+        value: semver.coerce(from),
+        raw: from,
+        // `*` means the version is not a range, but a single version.
+        range: fromRange === "*" ? null : fromRange,
+      },
+      to: {
+        value: semver.coerce(to),
+        raw: to,
+        range: toRange === "*" ? null : toRange,
+      },
       type: "range",
     };
   }
@@ -201,8 +226,11 @@ function parseVersionParams(versionString: string): VersionParams {
 let versionParams: VersionParams = parseVersionParams(program.args[1]);
 
 // Load installed version if not provided.
-if (versionParams.type === "range" && !versionParams.from) {
-  versionParams.from = await getInstalledPackageVersion(pkg, packageManager);
+if (versionParams.type === "range" && !versionParams.from.value) {
+  versionParams.from.value = await getInstalledPackageVersion(
+    pkg,
+    packageManager
+  );
 }
 
 console.log(versionParams);
@@ -476,8 +504,14 @@ function versionSatisfiesParams(
   }
 
   return (
-    (!params.from || semver.gte(version, params.from)) &&
-    (!params.to || semver.lte(version, params.to))
+    (!params.from.value ||
+      (params.from.range
+        ? semver.satisfies(version, params.from.range)
+        : semver.gte(version, params.from.value))) &&
+    (!params.to.value ||
+      (params.to.range
+        ? semver.satisfies(version, params.to.range)
+        : semver.lte(version, params.to.value)))
   );
 }
 
