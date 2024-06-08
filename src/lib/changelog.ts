@@ -25,7 +25,7 @@ export async function parseReleasesFromChangelog(
 
   let currentRelease: ReleaseWithTokens | null = null;
   for (const token of tokens) {
-    if (token.type === "heading" && token.depth === 2) {
+    if (token.type === "heading" && [1, 2, 3].includes(token.depth)) {
       const text = token.text.trim();
       const version = coerceToSemVer(text);
 
