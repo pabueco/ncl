@@ -250,9 +250,9 @@ async function navigateAndRender(mod = +1) {
   }`;
 
   console.log(
-    `${versionRangePart} | [${currentReleaseIndex + 1}/${
-      releases.length
-    }] Version: ${currentRelease.version}${datePart}   [${
+    `[${currentReleaseIndex + 1}/${releases.length}] Version: ${
+      currentRelease.version
+    }${datePart} | ${versionRangePart}   [${
       SYMBOLS.ArrowLeft
     }|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`
   );
