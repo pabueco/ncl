@@ -51,3 +51,18 @@ export type RawGitHubRelease = {
   html_url: string;
   published_at: string;
 };
+
+export type Context = {
+  package: string;
+  packageArgType:
+    | "package-name"
+    | "repo-name"
+    | "repo-url"
+    | "changelog"
+    | null;
+  repoUrl: string | null;
+  repoName: string | null;
+  basePath: string;
+  packageManager: PackageManager;
+  changelogUrl: string | null;
+};

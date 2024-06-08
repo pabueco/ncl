@@ -59,3 +59,9 @@ export async function parseReleasesFromChangelog(
 
   return releases;
 }
+
+export function isChangelogUrl(url: string) {
+  // ends with changelog or changelog.md
+  const regex = /changelog(\.md)?$/i;
+  return regex.test(url);
+}

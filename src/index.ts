@@ -11,16 +11,17 @@ import {
   SYMBOLS,
   KEY_SEQUENCES,
 } from "./constants";
-import type { VersionParams, Release } from "./types";
+import type { VersionParams, Release, Context } from "./types";
 import { debug } from "./utils";
 import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
 import { loadGitHubReleases } from "./lib/releases";
 import {
   detectPackageManager,
   getInstalledPackageVersion,
-  getPackageRepositoryUrl,
+  getPackageRepositoryNameFromUrl,
 } from "./lib/package";
 import { parseVersionParams } from "./lib/version";
+import { parsePackageArg } from "./lib/input";
 
 const program = await new Command()
   .addOption(
@@ -37,14 +38,8 @@ const program = await new Command()
   )
   .addOption(
     new Option(
-      "-s, --static",
+      "-l, --list",
       "Print all releases in a static list instead of interactive mode"
-    )
-  )
-  .addOption(
-    new Option(
-      "-r, --force-releases",
-      "Force the use of GitHub releases instead of parsing the changelog file"
     )
   )
   .addOption(
@@ -62,15 +57,28 @@ const program = await new Command()
   .addOption(
     new Option("-o, --order-by <field>", "The field to order releases by")
       .default("date")
-      .choices(["date", "version"])
+      .choices(["date", "version"] as const)
   )
   .addOption(
     new Option("-d, --order <dir>", "The direction to order releases in")
       .default("asc")
-      .choices(["asc", "desc"])
+      .choices(["asc", "desc"] as const)
+  )
+  .addOption(
+    new Option(
+      "-s, --source <source>",
+      "The source to get version changes from"
+    )
+      .default("changelog")
+      .choices(["changelog", "releases"] as const)
   )
   .addOption(new Option("--debug", "Debug mode"))
-  .addArgument(new Argument("<package>", "The package to inspect"))
+  .addArgument(
+    new Argument(
+      "<package/url>",
+      "The package name, GitHub URL or changelog URL to inspect"
+    )
+  )
   .addArgument(new Argument("[<version-range>]", "The version range to load"))
   .parseAsync(process.argv);
 
@@ -80,8 +88,6 @@ const basePath = options.project
   ? path.resolve(options.project)
   : process.cwd();
 
-debug({ basePath });
-
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
 if (!packageManager) {
@@ -90,7 +96,21 @@ if (!packageManager) {
 
 const [pkg, versionString] = program.processedArgs;
 
-debug(`Using package manager: ${packageManager} for package ${pkg}`);
+const context: Context = {
+  packageManager,
+  package: pkg,
+  packageArgType: null,
+  repoUrl: null,
+  repoName: null,
+  basePath,
+  changelogUrl: null,
+};
+
+// Check if package name is a URL to a raw changelog file.
+const parsedPackageArg = await parsePackageArg(pkg, context);
+context.packageArgType = parsedPackageArg.type;
+context.repoUrl = parsedPackageArg.repoUrl;
+context.repoName = parsedPackageArg.repoName;
 
 // Parse version range argument.
 let versionParams: VersionParams = parseVersionParams(versionString);
@@ -106,64 +126,51 @@ if (versionParams.type === "range" && !versionParams.from.value) {
   versionParams.from.excluding = true;
 }
 
-debug(inspect({ versionParams }, { depth: Infinity }));
+debug({ context, versionParams });
 
-let repoUrl = await getPackageRepositoryUrl(pkg, packageManager, basePath);
-if (repoUrl && !repoUrl.includes("github.com")) {
-  throw new Error(
-    `Unsupported repository URL: ${repoUrl}. Only GitHub is currently supported.`
-  );
-}
-
-if (!repoUrl) {
-  debug(`Could not detect repository URL, trying package name.`);
-
-  const maybeUrl = `https://github.com/${pkg}`;
-  const res = await fetch(maybeUrl);
-
-  if (res.ok) {
-    repoUrl = maybeUrl;
-  } else {
+if (context.packageArgType !== "changelog") {
+  if (!context.repoUrl) {
     throw new Error(`Could not detect repository URL for package ${pkg}`);
   }
-}
 
-debug({ repoUrl });
+  context.repoName ??= await getPackageRepositoryNameFromUrl(context.repoUrl);
 
-const isGithubCliInstalled = await $`gh --version`.quiet();
-if (isGithubCliInstalled.exitCode !== 0) {
-  throw new Error("GitHub CLI is not installed");
-}
-
-const repoName = repoUrl.match(/github.com\/(.*)$/)?.[1];
-debug({ repoName });
-
-if (!repoName) {
-  throw new Error("Could not find repository name");
+  if (!context.repoName) {
+    throw new Error("Could not find repository name");
+  }
 }
 
 let releases: Release[] = [];
 
-const changelogUrl = `https://raw.githubusercontent.com/${repoName}/${options.branch}/${options.file}`;
+context.changelogUrl =
+  context.packageArgType === "changelog"
+    ? context.package
+    : `https://raw.githubusercontent.com/${context.repoName}/${options.branch}/${options.file}`;
+
+debug(context);
 
 // Load releases from changelog file.
-if (!options.forceReleases) {
-  debug(`Fetching changelog from: ${changelogUrl}`);
-  const content = await loadChangelogFile(changelogUrl);
+if (options.source === "changelog") {
+  debug(`Fetching changelog from: ${context.changelogUrl}`);
+  const content = await loadChangelogFile(context.changelogUrl);
   const changelogReleases = await parseReleasesFromChangelog(
     content,
     versionParams
   );
 
-  if (changelogReleases) {
-    releases = changelogReleases;
-  }
+  releases = changelogReleases ?? [];
 }
 
 // Either the changelog file does not exist it did not contain any releases.
-if (!releases.length) {
+if (!releases.length || options.source === "releases") {
   console.warn(`Trying GitHub releases...`);
-  releases = await loadGitHubReleases(repoName, versionParams);
+
+  const isGithubCliInstalled = await $`gh --version`.quiet();
+  if (isGithubCliInstalled.exitCode !== 0) {
+    throw new Error("GitHub CLI is not installed");
+  }
+
+  releases = await loadGitHubReleases(context.repoName!, versionParams);
   debug(`Found ${releases.length} releases.`);
 }
 
@@ -195,7 +202,7 @@ marked.use(
   })
 );
 
-if (options.static) {
+if (options.list) {
   const isTokens = typeof releases[0].content !== "string";
 
   const string = isTokens
@@ -287,4 +294,5 @@ process.stdin.on("keypress", async (str, key) => {
 process.stdin.setRawMode(true);
 process.stdin.resume();
 
+// Initial render.
 navigateAndRender(0);

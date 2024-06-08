@@ -2,6 +2,7 @@ import { $ } from "bun";
 import type { PackageManager } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
+import { debug } from "../utils";
 
 export async function detectPackageManager(
   basePath: string
@@ -90,11 +91,24 @@ export async function getPackageRepositoryUrl(
     // We want to support getting changelogs without being in an actual project.
   }
 
-  if (!url) return null;
-
   // Remove git+ and .git from the URL
-  return url
+  url = url
     .trim()
     .replace(/git\+/, "")
     .replace(/\.git$/, "");
+
+  if (url) return url;
+
+  debug(`Could not detect repository URL, trying package name.`);
+
+  const maybeUrl = `https://github.com/${pkg}`;
+  const res = await fetch(maybeUrl);
+
+  return res.ok ? maybeUrl : null;
+}
+
+export async function getPackageRepositoryNameFromUrl(
+  url: string
+): Promise<string | null> {
+  return url.match(/github.com\/(.*)$/)?.[1] || null;
 }
