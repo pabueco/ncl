@@ -1,0 +1,96 @@
+// Bun Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`parseReleasesFromChangelog parses changelog with valid keepachangelog format 1`] = `
+"<h2>[0.0.1] - 2023-12-30</h2>
+<h3>Removed</h3>
+<ul>
+<li>Old feature</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with valid keepachangelog format 2`] = `
+"<h2>[0.1.0] - 2024-03-01</h2>
+<h3>Added</h3>
+<ul>
+<li>New feature</li>
+<li>Another feature</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Bug fix</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with valid keepachangelog format 3`] = `
+"<h2>[1.0.0] - 2024-04-18</h2>
+<h3>Added</h3>
+<ul>
+<li>Foo feature</li>
+<li>Bar feature</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>Baz feature</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with different format 1`] = `
+"<h1>[0.0.1] - 2023-12-30</h1>
+<ul>
+<li>Old feature removed</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with different format 2`] = `
+"<h1>[0.1.0] - 2024-03-01</h1>
+<ul>
+<li>Added new feature</li>
+<li>Added another feature</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with different format 3`] = `
+"<h1>[1.0.0] - 2024-04-18</h1>
+<ul>
+<li>Added foo feature</li>
+<li>Fixed bar feature</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with inconsistent format 1`] = `
+"<h1>[0.0.1] - 2023-12-30</h1>
+<h3>Removed</h3>
+<ul>
+<li>Old feature removed</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with inconsistent format 2`] = `
+"<h3>[0.1.0] - 2024-03-01</h3>
+<ul>
+<li>Added new feature</li>
+<li>Added another feature</li>
+</ul>
+"
+`;
+
+exports[`parseReleasesFromChangelog parses changelog with inconsistent format 3`] = `
+"<h2>[1.0.0] - 2024-04-18</h2>
+<h1>Added</h1>
+<ul>
+<li>Added foo feature</li>
+<li>Fixed bar feature</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>Baz feature</li>
+</ul>
+"
+`;

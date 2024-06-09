@@ -11,7 +11,7 @@ type ParsedArg = {
 
 export async function parsePackageArg(
   arg: string,
-  context: Context
+  getPackageRepoUrl: () => Promise<string | null>
 ): Promise<ParsedArg> {
   if (isChangelogUrl(arg)) {
     return { type: "changelog", repoUrl: null, repoName: null };
@@ -33,11 +33,7 @@ export async function parsePackageArg(
     };
   }
 
-  const repoUrl = await getPackageRepositoryUrl(
-    context.package,
-    context.packageManager,
-    context.basePath
-  );
+  const repoUrl = await getPackageRepoUrl();
 
   const repoName = repoUrl ? getRepoNameFromUrl(repoUrl) : null;
 
@@ -48,15 +44,15 @@ export async function parsePackageArg(
   };
 }
 
-function isRepoUrl(string: string): boolean {
+export function isRepoUrl(string: string): boolean {
   return string.startsWith(GITHUB_URL_PREFIX);
 }
 
-function getRepoNameFromUrl(url: string): string {
+export function getRepoNameFromUrl(url: string): string {
   return url.slice(GITHUB_URL_PREFIX.length).split("/").slice(0, 2).join("/");
 }
 
 // Two alphanumeric strings separated by a slash
-function isRepoName(string: string): boolean {
+export function isRepoName(string: string): boolean {
   return /^[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+$/.test(string);
 }

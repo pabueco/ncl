@@ -1,6 +1,7 @@
 import { marked } from "marked";
-import type { Release, ReleaseWithTokens, VersionParams } from "../types";
-import { coerceToSemVer, versionSatisfiesParams } from "./version";
+import type { Release, ReleaseWithTokens } from "../types";
+import { coerceToSemVer } from "./version";
+import type { SemVer } from "semver";
 
 export async function loadChangelogFile(url: string): Promise<string> {
   const res = await fetch(url);
@@ -13,7 +14,7 @@ export async function loadChangelogFile(url: string): Promise<string> {
 
 export async function parseReleasesFromChangelog(
   source: string,
-  versionParams: VersionParams
+  versionSatisfiesParams: (version: SemVer | string) => boolean
 ): Promise<Release[]> {
   if (!source) {
     return [];
@@ -39,7 +40,7 @@ export async function parseReleasesFromChangelog(
         releases.unshift(currentRelease);
       }
 
-      if (!versionSatisfiesParams(version, versionParams)) {
+      if (!versionSatisfiesParams(version)) {
         currentRelease = null;
         continue;
       }

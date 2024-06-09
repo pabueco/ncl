@@ -4,6 +4,7 @@ import type { RawGitHubRelease, Release, VersionParams } from "../types";
 import { debug } from "../utils";
 import { findValidVersionInStrings, versionSatisfiesParams } from "./version";
 import { format } from "date-fns";
+import type { marked as markedType } from "marked";
 
 export async function loadGitHubReleases(
   repoName: string,
@@ -70,4 +71,13 @@ export async function loadGitHubReleases(
     .filter((r) => {
       return versionSatisfiesParams(r.version, versionParams);
     });
+}
+
+export async function renderRelease(
+  release: Release,
+  marked: typeof markedType
+): Promise<string> {
+  return typeof release.content === "string"
+    ? await marked(release.content)
+    : marked.parser(release.content);
 }

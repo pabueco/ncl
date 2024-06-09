@@ -9,7 +9,7 @@ import semver, { SemVer } from "semver";
 import assert from "node:assert/strict";
 
 describe("maybeSemverRange", () => {
-  it("should return true for potential semver range", () => {
+  it("returns true for potential semver range", () => {
     expect(maybeSemverRange("1.x")).toBe(true);
     expect(maybeSemverRange(">1")).toBe(true);
     expect(maybeSemverRange(">=0.2.3")).toBe(true);
@@ -17,7 +17,7 @@ describe("maybeSemverRange", () => {
     expect(maybeSemverRange("~0.2.3")).toBe(true);
   });
 
-  it("should return false for fixed version", () => {
+  it("returns false for fixed version", () => {
     expect(maybeSemverRange("1.2.3")).toBe(false);
     expect(maybeSemverRange("1.2")).toBe(false);
     expect(maybeSemverRange("1")).toBe(false);
@@ -25,39 +25,39 @@ describe("maybeSemverRange", () => {
 });
 
 describe("coerceToSemVer", () => {
-  it("should return null for invalid version", () => {
+  it("returns null for invalid version", () => {
     expect(coerceToSemVer(null)).toBe(null);
     expect(coerceToSemVer("")).toBe(null);
     expect(coerceToSemVer("abc")).toBe(null);
     expect(coerceToSemVer("a.b.c")).toBe(null);
   });
 
-  it("should return SemVer for valid version", () => {
+  it("returns SemVer for valid version", () => {
     expect(coerceToSemVer("1.2.3")).toBeInstanceOf(SemVer);
     expect(coerceToSemVer("1.2.3")?.toString()).toBe("1.2.3");
     expect(coerceToSemVer("1")?.toString()).toBe("1.0.0");
     expect(coerceToSemVer("1.3")?.toString()).toBe("1.3.0");
   });
 
-  it("should include prerelease", () => {
+  it("includes prerelease", () => {
     expect(coerceToSemVer("1.2.3-beta")).toBeInstanceOf(SemVer);
     expect(coerceToSemVer("1.2.3-beta")?.toString()).toBe("1.2.3-beta");
   });
 });
 
 describe("findValidVersionInStrings", () => {
-  it("should find and coerce a version in strings", () => {
+  it("finds and coerces a semver version in strings", () => {
     expect(
       findValidVersionInStrings(["hello world", "release: v3.2"])?.toString()
     ).toBe("3.2.0");
   });
-  it("should return null for invalid versions", () => {
+  it("returns null for invalid versions", () => {
     expect(findValidVersionInStrings(["abc", "def"])).toBe(null);
   });
 });
 
 describe("parseVersionParams", () => {
-  it("should parse specific version", () => {
+  it("parses specific version", () => {
     const params = parseVersionParams("1.2");
     expect(params.type).toBe("ref");
 
@@ -67,7 +67,7 @@ describe("parseVersionParams", () => {
     });
   });
 
-  it("should parse specific range", () => {
+  it("parses specific range", () => {
     const params = parseVersionParams(">=1.2.3");
     expect(params).toEqual({
       type: "ref",
@@ -75,7 +75,7 @@ describe("parseVersionParams", () => {
     });
   });
 
-  it("should parse from", () => {
+  it("parses from", () => {
     const params = parseVersionParams("3..");
 
     expect(params.type).toBe("range");
@@ -88,7 +88,7 @@ describe("parseVersionParams", () => {
     expect(params.to.value).toBe(null);
   });
 
-  it("should parse to", () => {
+  it("parses to", () => {
     const params = parseVersionParams("..3");
 
     expect(params.type).toBe("range");
@@ -100,7 +100,7 @@ describe("parseVersionParams", () => {
     expect(params.to.value?.toString()).toBe("3.0.0");
   });
 
-  it("should parse to with semver range", () => {
+  it("parses to with semver range", () => {
     const params = parseVersionParams("..3.x");
 
     expect(params.type).toBe("range");
@@ -115,7 +115,7 @@ describe("parseVersionParams", () => {
     expect(semver.satisfies("3.2.1", params.to.range!)).toBeTrue();
   });
 
-  it("should parse from and to", () => {
+  it("parses from and to", () => {
     const params = parseVersionParams("1.2..3");
 
     expect(params.type).toBe("range");

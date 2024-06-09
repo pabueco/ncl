@@ -14,12 +14,13 @@ import {
 import type { VersionParams, Release, Context } from "./types";
 import { debug, error } from "./utils";
 import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
-import { loadGitHubReleases } from "./lib/releases";
+import { loadGitHubReleases, renderRelease } from "./lib/releases";
 import {
   detectPackageManager,
   getInstalledPackageVersion,
+  getPackageRepositoryUrl,
 } from "./lib/package";
-import { parseVersionParams } from "./lib/version";
+import { parseVersionParams, versionSatisfiesParams } from "./lib/version";
 import { parsePackageArg } from "./lib/input";
 
 const program = await new Command()
@@ -106,7 +107,13 @@ const context: Context = {
 };
 
 // Check if package name is a URL to a raw changelog file.
-const parsedPackageArg = await parsePackageArg(pkg, context);
+const parsedPackageArg = await parsePackageArg(pkg, () =>
+  getPackageRepositoryUrl(
+    context.package,
+    context.packageManager,
+    context.basePath
+  )
+);
 context.packageArgType = parsedPackageArg.type;
 context.repoUrl = parsedPackageArg.repoUrl;
 context.repoName = parsedPackageArg.repoName;
@@ -152,7 +159,7 @@ if (options.source === "changelog") {
   const content = await loadChangelogFile(context.changelogUrl);
   const changelogReleases = await parseReleasesFromChangelog(
     content,
-    versionParams
+    (version) => versionSatisfiesParams(version, versionParams)
   );
 
   releases = changelogReleases ?? [];
@@ -254,10 +261,7 @@ async function navigateAndRender(mod = +1) {
     }|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`
   );
 
-  const string =
-    typeof currentRelease.content === "string"
-      ? await marked(currentRelease.content)
-      : marked.parser(currentRelease.content);
+  const string = await renderRelease(currentRelease, marked);
 
   console.log(string);
 }
