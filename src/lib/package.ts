@@ -27,6 +27,10 @@ export async function detectPackageManager(
     return "composer";
   }
 
+  if (await Bun.file(`${basePath}/Cargo.toml`).exists()) {
+    return "cargo";
+  }
+
   return null;
 }
 
@@ -56,6 +60,11 @@ export async function getInstalledPackageVersion(
         const match = info.match(/versions[ \t]+: \* (.*)/);
         return match?.[1] || null;
       }
+      case "cargo": {
+        const info = await $`cargo metadata`.cwd(basePath).json();
+        const dep = info.packages.find((p: any) => p.name === pkg);
+        return dep?.version || null;
+      }
     }
   })();
 
@@ -84,6 +93,11 @@ export async function getPackageRepositoryUrl(
         const match = info.match(/source[ \t]+: \[git\] (.*) .*/);
         url = match?.[1] || "";
         break;
+      }
+      case "cargo": {
+        const info = await $`cargo metadata`.cwd(basePath).json();
+        const dep = info.packages.find((p: any) => p.name === pkg);
+        return dep?.repository || null;
       }
     }
   } catch (e) {

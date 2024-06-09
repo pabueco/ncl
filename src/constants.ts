@@ -6,6 +6,7 @@ export const SUPPORTED_PACKAGE_MANAGERS = [
   "pnpm",
   "bun",
   "composer",
+  "cargo",
 ] as const;
 
 export const SYMBOLS = {
