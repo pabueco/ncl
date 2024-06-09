@@ -43,14 +43,14 @@ export async function loadGitHubReleases(
 
     rawReleases.push(...releasesJson);
 
-    const lastRelease = releasesJson[releasesJson.length - 1];
-    const lastVersion = findValidVersionInStrings([
-      lastRelease.tag_name,
-      lastRelease.name,
-    ]);
-
-    // TODO: This is not working as expected when the last version is not satisfying the params, but the ones on the previous page are.
+    // This is not working as expected when the last version is not satisfying the params, but the ones on the previous page are.
     // This can happen with pre-releases for example. Fetching everything is probably the best option.
+    // TODO: Find a better way to not have to fetch all releases.
+    // const lastRelease = releasesJson[releasesJson.length - 1];
+    // const lastVersion = findValidVersionInStrings([
+    //   lastRelease.tag_name,
+    //   lastRelease.name,
+    // ]);
     // if (hasFoundStart && !versionSatisfiesParams(lastVersion, versionParams)) {
     //   debug(`Reached version ${lastVersion}, stopping.`);
     //   break;

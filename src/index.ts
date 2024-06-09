@@ -1,5 +1,5 @@
 import { Argument, Command, Option } from "@commander-js/extra-typings";
-import { $, inspect } from "bun";
+import { $ } from "bun";
 import path from "node:path";
 import semver from "semver";
 import { marked, type Token } from "marked";

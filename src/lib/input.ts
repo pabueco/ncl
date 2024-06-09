@@ -35,12 +35,10 @@ export async function parsePackageArg(
 
   const repoUrl = await getPackageRepoUrl();
 
-  const repoName = repoUrl ? getRepoNameFromUrl(repoUrl) : null;
-
   return {
     type: "package-name",
     repoUrl,
-    repoName,
+    repoName: repoUrl ? getRepoNameFromUrl(repoUrl) : null,
   };
 }
 

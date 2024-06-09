@@ -35,11 +35,9 @@ export async function getInstalledPackageVersion(
   const version = await (async () => {
     switch (manager) {
       case "npm":
-        return await $`npm info ${pkg} version`.cwd(basePath).text();
       case "yarn":
-        return await $`yarn info ${pkg} version`.cwd(basePath).text();
       case "pnpm":
-        return await $`pnpm info ${pkg} version`.cwd(basePath).text();
+        return await $`${manager} info ${pkg} version`.cwd(basePath).text();
       case "bun": {
         const list = await $`bun pm ls`.cwd(basePath).text();
         // Must start with a space to avoid matching another package which ends with the same name.

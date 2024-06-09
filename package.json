@@ -1,11 +1,11 @@
 {
-  "name": "package-changelog",
+  "name": "ncl",
   "module": "index.ts",
   "type": "module",
-  "bin": "./bin/chlg",
+  "bin": "./bin/ncl",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build ./src/index.ts --compile --outfile ./bin/chlg"
+    "build": "bun build ./src/index.ts --compile --outfile ./bin/ncl"
   },
   "devDependencies": {
     "@types/bun": "latest",
