@@ -12,13 +12,12 @@ import {
   KEY_SEQUENCES,
 } from "./constants";
 import type { VersionParams, Release, Context } from "./types";
-import { debug } from "./utils";
+import { debug, error } from "./utils";
 import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
 import { loadGitHubReleases } from "./lib/releases";
 import {
   detectPackageManager,
   getInstalledPackageVersion,
-  getPackageRepositoryNameFromUrl,
 } from "./lib/package";
 import { parseVersionParams } from "./lib/version";
 import { parsePackageArg } from "./lib/input";
@@ -91,7 +90,7 @@ const basePath = options.project
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
 if (!packageManager) {
-  throw new Error("Could not detect package manager");
+  throw error("Could not detect package manager");
 }
 
 const [pkg, versionString] = program.processedArgs;
@@ -130,13 +129,11 @@ debug({ context, versionParams });
 
 if (context.packageArgType !== "changelog") {
   if (!context.repoUrl) {
-    throw new Error(`Could not detect repository URL for package ${pkg}`);
+    throw error(`Could not find repository URL for package '${pkg}'`);
   }
 
-  context.repoName ??= await getPackageRepositoryNameFromUrl(context.repoUrl);
-
   if (!context.repoName) {
-    throw new Error("Could not find repository name");
+    throw error("Could not find repository name");
   }
 }
 
@@ -167,7 +164,7 @@ if (!releases.length || options.source === "releases") {
 
   const isGithubCliInstalled = await $`gh --version`.quiet();
   if (isGithubCliInstalled.exitCode !== 0) {
-    throw new Error("GitHub CLI is not installed");
+    throw error("GitHub CLI is not installed");
   }
 
   releases = await loadGitHubReleases(context.repoName!, versionParams);
@@ -187,7 +184,7 @@ if (options.order === "desc") {
 }
 
 if (!releases.length) {
-  throw new Error("No releases found");
+  throw error("No releases found");
 }
 
 const rl = readline.createInterface({
@@ -266,7 +263,6 @@ async function navigateAndRender(mod = +1) {
 }
 
 process.stdin.on("keypress", async (str, key) => {
-  // '\u0003' is Ctrl+C
   if (key.name === "q" || key.sequence === KEY_SEQUENCES.CtrlC) {
     rl.close();
     process.exit();

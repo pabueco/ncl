@@ -106,9 +106,3 @@ export async function getPackageRepositoryUrl(
 
   return res.ok ? maybeUrl : null;
 }
-
-export async function getPackageRepositoryNameFromUrl(
-  url: string
-): Promise<string | null> {
-  return url.match(/github.com\/(.*)$/)?.[1] || null;
-}
