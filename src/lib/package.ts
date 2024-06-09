@@ -1,4 +1,4 @@
-import { $ } from "bun";
+import { $, Glob } from "bun";
 import type { PackageManager } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
@@ -7,28 +7,21 @@ import { debug } from "../utils";
 export async function detectPackageManager(
   basePath: string
 ): Promise<PackageManager | null> {
-  if (await Bun.file(`${basePath}/yarn.lock`).exists()) {
-    return "yarn";
-  }
+  const managerByFile: Record<string, PackageManager> = {
+    "yarn.lock": "yarn",
+    "package-lock.json": "npm",
+    "pnpm-lock.yaml": "pnpm",
+    "bun.lockb": "bun",
+    "composer.json": "composer",
+    "Cargo.toml": "cargo",
+  };
 
-  if (await Bun.file(`${basePath}/package-lock.json`).exists()) {
-    return "npm";
-  }
+  const glob = new Glob("*");
 
-  if (await Bun.file(`${basePath}/pnpm-lock.yaml`).exists()) {
-    return "pnpm";
-  }
-
-  if (await Bun.file(`${basePath}/bun.lockb`).exists()) {
-    return "bun";
-  }
-
-  if (await Bun.file(`${basePath}/composer.json`).exists()) {
-    return "composer";
-  }
-
-  if (await Bun.file(`${basePath}/Cargo.toml`).exists()) {
-    return "cargo";
+  for await (const file of glob.scan({ cwd: basePath })) {
+    if (managerByFile[file]) {
+      return managerByFile[file];
+    }
   }
 
   return null;
