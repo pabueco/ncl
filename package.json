@@ -2,6 +2,7 @@
   "name": "package-changelog",
   "module": "index.ts",
   "type": "module",
+  "bin": "./bin/chlg",
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "bun build ./src/index.ts --compile --outfile ./bin/chlg"
