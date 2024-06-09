@@ -117,17 +117,6 @@ export function parseVersionParams(versionString?: string): VersionParams {
       type: "range",
     };
 
-    // Check that the range are not mutually exclusive.
-    // if (
-    //   params.from.range &&
-    //   params.to.range &&
-    //   !semver.intersects(params.from.range, params.to.range)
-    // ) {
-    //   throw new Error(
-    //     `Invalid version range: ${versionString}. The from and to ranges are mutually exclusive.`
-    //   );
-    // }
-
     if (!params.from.value && !params.to.value) {
       throw new Error(
         `Invalid version range: ${versionString}. Both from and to are invalid.`
