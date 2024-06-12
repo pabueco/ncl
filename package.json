@@ -1,8 +1,10 @@
 {
-  "name": "ncl",
-  "module": "index.ts",
+  "name": "@pabueco/ncl",
+  "module": "src/index.ts",
   "type": "module",
-  "bin": "./bin/ncl",
+  "bin": {
+    "ncl": "./bin/ncl"
+  },
   "version": "0.1.0",
   "scripts": {
     "dev": "bun --watch src/index.ts",
