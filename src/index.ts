@@ -22,6 +22,7 @@ import {
 } from "./lib/package";
 import { parseVersionParams, versionSatisfiesParams } from "./lib/version";
 import { parsePackageArg } from "./lib/input";
+import chalk from "chalk";
 
 const program = await new Command()
   .addOption(
@@ -253,17 +254,21 @@ async function navigateAndRender(mod = +1) {
     releases[releases.length - 1].version
   }`;
 
-  console.log(
-    `[${currentReleaseIndex + 1}/${releases.length}] Version: ${
-      currentRelease.version
-    }${datePart} | ${versionRangePart}   [${
-      SYMBOLS.ArrowLeft
-    }|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`
-  );
+  const pager = `[${currentReleaseIndex + 1}/${releases.length}]`;
+
+  const header = `${pager} ${chalk.magenta(
+    currentRelease.version
+  )}${datePart} | ${versionRangePart}`;
+
+  const footer = `[${SYMBOLS.ArrowLeft}|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`;
+
+  console.log(header + "\n");
 
   const string = await renderRelease(currentRelease, marked);
 
-  console.log(string);
+  console.log(string.trim());
+
+  console.log("\n" + chalk.dim(footer));
 }
 
 process.stdin.on("keypress", async (str, key) => {
