@@ -25,6 +25,9 @@ import { parsePackageArg } from "./lib/input";
 import chalk from "chalk";
 
 const program = await new Command()
+  .description(
+    `Interactively view changelogs of packages and GitHub repositories in the terminal.`
+  )
   .addOption(
     new Option(
       "-p, --project <project>",
