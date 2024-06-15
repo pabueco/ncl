@@ -3,9 +3,9 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "./build/index.js"
+    "ncl": "./bin/index.ts"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
