@@ -1,6 +1,4 @@
-import type { Context } from "../types";
 import { isChangelogUrl } from "./changelog";
-import { getPackageRepositoryUrl } from "./package";
 const GITHUB_URL_PREFIX = "https://github.com/";
 
 type ParsedArg = {

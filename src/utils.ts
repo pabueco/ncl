@@ -1,5 +1,4 @@
 import { inspect } from "bun";
-import chalk from "chalk";
 
 export function debug(...args: any[]) {
   if (process.env.DEBUG) {

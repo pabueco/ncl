@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/marked-terminal": "^6.1.1",
     "@types/semver": "^7.5.8"
   },
   "peerDependencies": {

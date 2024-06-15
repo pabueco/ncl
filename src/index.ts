@@ -1,16 +1,10 @@
-import { Argument, Command, Option } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import path from "node:path";
 import semver from "semver";
 import { marked, type Token } from "marked";
-// @ts-expect-error missing types
 import { markedTerminal } from "marked-terminal";
 import readline from "readline";
-import {
-  SUPPORTED_PACKAGE_MANAGERS,
-  SYMBOLS,
-  KEY_SEQUENCES,
-} from "./constants";
+import { SYMBOLS, KEY_SEQUENCES } from "./constants";
 import type { VersionParams, Release, Context } from "./types";
 import { debug } from "./utils";
 import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
@@ -23,71 +17,10 @@ import {
 import { parseVersionParams, versionSatisfiesParams } from "./lib/version";
 import { parsePackageArg } from "./lib/input";
 import chalk from "chalk";
-import ora from "ora";
+import { makeProgram } from "./lib/program";
 
-const program = await new Command()
-  .description(
-    `Interactively view changelogs of packages and GitHub repositories in the terminal.`
-  )
-  .addOption(
-    new Option(
-      "-p, --project <project>",
-      "Path to the directory to run in. Defaults to the current directory."
-    )
-  )
-  .addOption(
-    new Option(
-      "-m, --package-manager <package-manager>",
-      "The package manager to use for detecting the installed version and other info"
-    ).choices(SUPPORTED_PACKAGE_MANAGERS)
-  )
-  .addOption(
-    new Option(
-      "-l, --list",
-      "Print all releases in a static list instead of interactive mode"
-    )
-  )
-  .addOption(
-    new Option(
-      "-b, --branch <branch>",
-      "The branch to look for and load the changelog file from"
-    ).default("main")
-  )
-  .addOption(
-    new Option(
-      "-f, --file <branch>",
-      "The filename of the changelog file"
-    ).default("CHANGELOG.md")
-  )
-  .addOption(
-    new Option("-o, --order-by <field>", "The field to order releases by")
-      .default("date")
-      .choices(["date", "version"] as const)
-  )
-  .addOption(
-    new Option("-d, --order <dir>", "The direction to order releases in")
-      .default("asc")
-      .choices(["asc", "desc"] as const)
-  )
-  .addOption(
-    new Option(
-      "-s, --source <source>",
-      "The source to get version changes from"
-    )
-      .default("changelog")
-      .choices(["changelog", "releases"] as const)
-  )
-  .addOption(new Option("--debug", "Debug mode"))
-  .addArgument(
-    new Argument(
-      "<package/url>",
-      "The package name, GitHub URL or changelog URL to inspect"
-    )
-  )
-  .addArgument(new Argument("[<version-range>]", "The version range to load"))
-  .parseAsync(process.argv);
-
-const options = program.opts();
+const program = await makeProgram();
+const options = program.getOptions();
 
 const basePath = options.project
   ? path.resolve(options.project)
@@ -95,20 +28,12 @@ const basePath = options.project
 
 console.clear();
 
-const spinner = ora("Detecting package manager").start();
-const updateSpinner = (text: string) => {
-  spinner.text = text;
-};
-const error = (message: string) => {
-  spinner.stop();
-  console.log(chalk.red(`${chalk.bold("ERROR")}: ${message}`));
-  process.exit(1);
-};
+program.spinner.text = "Detecting package manager";
 
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
 
-const [pkg, versionString] = program.processedArgs;
+const [pkg, versionString] = program.getArguments();
 
 const context: Context = {
   packageManager,
@@ -120,15 +45,17 @@ const context: Context = {
   changelogUrl: null,
 };
 
-updateSpinner(`Parsing arguments`);
+program.setSpinnerText(`Parsing arguments`);
 
 // Check if package name is a URL to a raw changelog file.
 const parsedPackageArg = await parsePackageArg(pkg, () => {
   if (!packageManager) {
-    throw error("Could not find package manager to retrieve repository URL.");
+    throw program.error(
+      "Could not find package manager to retrieve repository URL."
+    );
   }
 
-  updateSpinner(`Getting repository info`);
+  program.setSpinnerText(`Getting repository info`);
 
   return getPackageRepositoryUrl(
     context.package,
@@ -146,12 +73,12 @@ let versionParams: VersionParams = parseVersionParams(versionString);
 // Load installed version if not provided.
 if (versionParams.type === "range" && !versionParams.from.value) {
   if (!packageManager) {
-    throw error(
+    throw program.error(
       "Could not find package manager to retrieve installed version."
     );
   }
 
-  updateSpinner(`Detecting installed version`);
+  program.setSpinnerText(`Detecting installed version`);
 
   versionParams.from.value = await getInstalledPackageVersion(
     pkg,
@@ -166,11 +93,11 @@ debug({ context, versionParams });
 
 if (context.packageArgType !== "changelog") {
   if (!context.repoUrl) {
-    throw error(`Could not find repository URL for package '${pkg}'`);
+    throw program.error(`Could not find repository URL for package '${pkg}'`);
   }
 
   if (!context.repoName) {
-    throw error("Could not find repository name");
+    throw program.error("Could not find repository name");
   }
 }
 
@@ -186,11 +113,11 @@ debug(context);
 // Load releases from changelog file.
 if (options.source === "changelog") {
   debug(`Fetching changelog from: ${context.changelogUrl}`);
-  updateSpinner(`Fetching changelog`);
+  program.setSpinnerText(`Fetching changelog`);
 
   const content = await loadChangelogFile(context.changelogUrl);
   if (content === null) {
-    throw error(`Failed to load changelog file.`);
+    throw program.error(`Failed to load changelog file.`);
   }
   const changelogReleases = await parseReleasesFromChangelog(
     content,
@@ -203,11 +130,11 @@ if (options.source === "changelog") {
 // Either the changelog file does not exist it did not contain any releases.
 if (!releases.length || options.source === "releases") {
   debug(`Trying GitHub releases...`);
-  updateSpinner(`Fetching GitHub releases`);
+  program.setSpinnerText(`Fetching GitHub releases`);
 
   const isGithubCliInstalled = await $`gh --version`.quiet();
   if (isGithubCliInstalled.exitCode !== 0) {
-    throw error(
+    throw program.error(
       "GitHub CLI is not installed but required for fetching releases."
     );
   }
@@ -215,7 +142,7 @@ if (!releases.length || options.source === "releases") {
   try {
     releases = await loadGitHubReleases(context.repoName!, versionParams);
   } catch (e) {
-    throw error(`Failed to load GitHub releases.`);
+    throw program.error(`Failed to load GitHub releases.`);
   }
 
   debug(`Found ${releases.length} releases.`);
@@ -234,10 +161,10 @@ if (options.order === "desc") {
 }
 
 if (!releases.length) {
-  throw error("No releases found");
+  throw program.error("No releases found");
 }
 
-spinner.stop();
+program.spinner.stop();
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -248,7 +175,7 @@ marked.use(
   markedTerminal({
     // reflowText: true,
     // width: 80,
-  })
+  }) as any
 );
 
 if (options.list) {
