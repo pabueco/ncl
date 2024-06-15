@@ -14,14 +14,17 @@ Note, that you can work around unsupported package managers by proding the repos
 
 ## Installation
 
-You can use the utility without a manual download or installation via `npx`.
-Alternatively, you can install the binary from NPM or download it manually from the latest release.
+> [!NOTE]  
+> Due to the use of built-in modules `ncl` only works with [Bun](https://bun.sh/). You cannot run it with Node.
 
 ```sh
-npm i -g @pabueco/ncl
-```
+# Run it directly (like `npx`):
+bunx @pabueco/ncl <args>
 
-The utility is distributed as a standalone binary (compiled by bun), so there are no direct requirements or dependencies.
+# Install it globally and run it:
+bun i -g @pabueco/ncl
+bunx ncl <args>
+```
 
 ## Usage
 

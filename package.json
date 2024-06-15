@@ -3,12 +3,13 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "./bin/ncl"
+    "ncl": "./build/index.js"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "build": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl"
+    "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
+    "build": "bun build ./src/index.ts --outdir build --target bun"
   },
   "devDependencies": {
     "@types/bun": "latest",
