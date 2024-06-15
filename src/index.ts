@@ -94,9 +94,6 @@ const basePath = options.project
 
 const packageManager =
   options.packageManager || (await detectPackageManager(basePath));
-if (!packageManager) {
-  throw error("Could not detect package manager");
-}
 
 const [pkg, versionString] = program.processedArgs;
 
@@ -111,13 +108,17 @@ const context: Context = {
 };
 
 // Check if package name is a URL to a raw changelog file.
-const parsedPackageArg = await parsePackageArg(pkg, () =>
-  getPackageRepositoryUrl(
+const parsedPackageArg = await parsePackageArg(pkg, () => {
+  if (!packageManager) {
+    throw error("Could not find package manager to retrieve repository URL.");
+  }
+
+  return getPackageRepositoryUrl(
     context.package,
-    context.packageManager,
+    context.packageManager!,
     context.basePath
-  )
-);
+  );
+});
 context.packageArgType = parsedPackageArg.type;
 context.repoUrl = parsedPackageArg.repoUrl;
 context.repoName = parsedPackageArg.repoName;
@@ -127,6 +128,12 @@ let versionParams: VersionParams = parseVersionParams(versionString);
 
 // Load installed version if not provided.
 if (versionParams.type === "range" && !versionParams.from.value) {
+  if (!packageManager) {
+    throw error(
+      "Could not find package manager to retrieve installed version."
+    );
+  }
+
   versionParams.from.value = await getInstalledPackageVersion(
     pkg,
     packageManager,
@@ -171,7 +178,7 @@ if (options.source === "changelog") {
 
 // Either the changelog file does not exist it did not contain any releases.
 if (!releases.length || options.source === "releases") {
-  console.warn(`Trying GitHub releases...`);
+  debug(`Trying GitHub releases...`);
 
   const isGithubCliInstalled = await $`gh --version`.quiet();
   if (isGithubCliInstalled.exitCode !== 0) {
