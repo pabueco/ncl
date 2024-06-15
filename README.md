@@ -1,6 +1,6 @@
 # ncl
 
-> **n**ice **c**hange**l**og
+> nice changelog
 
 ncl provides a quick and easy way to view the relevant changelog entries or GitHub releases for dependencies or general GitHub repositories. The main goal was to make dependeny upgrades a bit easier, but you can also use it to explore and discover changes of any GitHub repository.
 
@@ -16,6 +16,10 @@ Note, that you can work around unsupported package managers by proding the repos
 
 You can use the utility without a manual download or installation via `npx`.
 Alternatively, you can install the binary from NPM or download it manually from the latest release.
+
+```sh
+npm i -g @pabueco/ncl
+```
 
 The utility is distributed as a standalone binary (compiled by bun), so there are no direct requirements or dependencies.
 
@@ -55,7 +59,7 @@ ncl https://github.com/vuejs/core
 ncl https://raw.githubusercontent.com/vuejs/core/main/changelogs/CHANGELOG-3.2.md
 
 # Change the order of changes:
-ncl <pkg>> --order desc
+ncl <pkg> --order desc
 
 # Print all changelog entries once instead of viewing them interactively:
 ncl <pkg> --list
