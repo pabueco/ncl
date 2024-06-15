@@ -63,6 +63,6 @@ export type Context = {
   repoUrl: string | null;
   repoName: string | null;
   basePath: string;
-  packageManager: PackageManager;
+  packageManager: PackageManager | null;
   changelogUrl: string | null;
 };

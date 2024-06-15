@@ -23,10 +23,6 @@ export async function loadGitHubReleases(
     const releases =
       await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${repoName}/releases -X GET -f per_page=100 -f page=${page}`.quiet();
 
-    if (releases.exitCode !== 0) {
-      throw new Error("Could not fetch releases" + releases.stderr.toString());
-    }
-
     const releasesJson: RawGitHubRelease[] = releases.json();
 
     if (!releasesJson.length) {

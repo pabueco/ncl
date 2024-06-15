@@ -3,10 +3,10 @@ import type { Release, ReleaseWithTokens } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
 
-export async function loadChangelogFile(url: string): Promise<string> {
+export async function loadChangelogFile(url: string): Promise<string | null> {
   const res = await fetch(url);
   if (!res.ok) {
-    return "";
+    return null;
   }
 
   return await res.text();
