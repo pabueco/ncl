@@ -20,7 +20,7 @@
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
     "build": "bun build ./src/index.ts --outdir build --target node",
-    "prepublish": "bun run build"
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",
