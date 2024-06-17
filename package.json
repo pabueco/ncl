@@ -3,12 +3,12 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "./build/index.js"
+    "ncl": "build/index.js"
   },
   "version": "0.3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pabueco/ncl.git"
+    "url": "git+https://github.com/pabueco/ncl.git"
   },
   "files": [
     "build",
