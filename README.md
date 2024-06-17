@@ -14,16 +14,15 @@ Note, that you can work around unsupported package managers by proding the repos
 
 ## Installation
 
-> [!NOTE]  
-> Due to the use of built-in modules `ncl` only works with [Bun](https://bun.sh/). You cannot run it with Node.
+You can easily run `ncl` via `npx` (or alternatives like `bunx` and `pnpx`):
 
 ```sh
-# Run it directly (like `npx`):
-bunx @pabueco/ncl <args>
+# Run it directly
+npx @pabueco/ncl <args>
 
-# Install it globally and run it:
-bun i -g @pabueco/ncl
-bunx ncl <args>
+# or install it globally to remove the need for the scope:
+npm i -g @pabueco/ncl
+npx ncl <args>
 ```
 
 ## Usage
