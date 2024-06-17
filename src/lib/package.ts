@@ -1,4 +1,4 @@
-import { $, Glob } from "bun";
+import { $, globby } from "zx";
 import type { PackageManager } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
@@ -16,9 +16,9 @@ export async function detectPackageManager(
     "Cargo.toml": "cargo",
   };
 
-  const glob = new Glob("*");
+  const files = await globby("*", { cwd: basePath, onlyFiles: true });
 
-  for await (const file of glob.scan({ cwd: basePath })) {
+  for (const file of files) {
     if (managerByFile[file]) {
       return managerByFile[file];
     }
@@ -29,30 +29,27 @@ export async function detectPackageManager(
 
 export async function getInstalledPackageVersion(
   pkg: string,
-  manager: PackageManager,
-  basePath: string
+  manager: PackageManager
 ): Promise<SemVer | null> {
   const version = await (async () => {
     switch (manager) {
       case "npm":
       case "yarn":
       case "pnpm":
-        return await $`${manager} info ${pkg} version`.cwd(basePath).text();
+        return await $`${manager} info ${pkg} version`.text();
       case "bun": {
-        const list = await $`bun pm ls`.cwd(basePath).text();
+        const list = await $`bun pm ls`.text();
         // Must start with a space to avoid matching another package which ends with the same name.
         const match = list.match(new RegExp(` ${pkg}@(.*)`));
         return match?.[1] || null;
       }
       case "composer": {
-        const info = await $`composer show ${pkg} --no-ansi`
-          .cwd(basePath)
-          .text();
+        const info = await $`composer show ${pkg} --no-ansi`.text();
         const match = info.match(/versions[ \t]+: \* (.*)/);
         return match?.[1] || null;
       }
       case "cargo": {
-        const info = await $`cargo metadata`.cwd(basePath).json();
+        const info = await $`cargo metadata`.json();
         const dep = info.packages.find((p: any) => p.name === pkg);
         return dep?.version || null;
       }
@@ -64,8 +61,7 @@ export async function getInstalledPackageVersion(
 
 export async function getPackageRepositoryUrl(
   pkg: string,
-  manager: PackageManager,
-  basePath: string
+  manager: PackageManager
 ): Promise<string | null> {
   let url = "";
 
@@ -75,18 +71,16 @@ export async function getPackageRepositoryUrl(
       case "yarn":
       case "pnpm":
       case "bun":
-        url = await $`npm view ${pkg} repository.url`.cwd(basePath).text();
+        url = await $`npm view ${pkg} repository.url`.text();
         break;
       case "composer": {
-        const info = await $`composer show ${pkg} --no-ansi`
-          .cwd(basePath)
-          .text();
+        const info = await $`composer show ${pkg} --no-ansi`.text();
         const match = info.match(/source[ \t]+: \[git\] (.*) .*/);
         url = match?.[1] || "";
         break;
       }
       case "cargo": {
-        const info = await $`cargo metadata`.cwd(basePath).json();
+        const info = await $`cargo metadata`.json();
         const dep = info.packages.find((p: any) => p.name === pkg);
         return dep?.repository || null;
       }

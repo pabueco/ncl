@@ -1,4 +1,4 @@
-import { inspect } from "bun";
+import { inspect } from "node:util";
 
 export function debug(...args: any[]) {
   if (process.env.DEBUG) {

@@ -1,4 +1,4 @@
-import { $ } from "bun";
+import { $ } from "zx";
 import { GITHUB_PAGE_LIMIT } from "../constants";
 import type { RawGitHubRelease, Release, VersionParams } from "../types";
 import { debug } from "../utils";

@@ -1,4 +1,4 @@
-import { $ } from "bun";
+import { $ } from "zx";
 import path from "node:path";
 import semver from "semver";
 import { marked, type Token } from "marked";
@@ -26,6 +26,9 @@ const basePath = options.project
   ? path.resolve(options.project)
   : process.cwd();
 
+// Set the current working directory for all commands.
+$.cwd = basePath;
+
 console.clear();
 
 program.spinner.text = "Detecting package manager";
@@ -49,7 +52,7 @@ program.setSpinnerText(`Parsing arguments`);
 
 // Check if package name is a URL to a raw changelog file.
 const parsedPackageArg = await parsePackageArg(pkg, () => {
-  if (!packageManager) {
+  if (!context.packageManager) {
     throw program.error(
       "Could not find package manager to retrieve repository URL."
     );
@@ -57,11 +60,7 @@ const parsedPackageArg = await parsePackageArg(pkg, () => {
 
   program.setSpinnerText(`Getting repository info`);
 
-  return getPackageRepositoryUrl(
-    context.package,
-    context.packageManager!,
-    context.basePath
-  );
+  return getPackageRepositoryUrl(context.package, context.packageManager);
 });
 context.packageArgType = parsedPackageArg.type;
 context.repoUrl = parsedPackageArg.repoUrl;
@@ -82,8 +81,7 @@ if (versionParams.type === "range" && !versionParams.from.value) {
 
   versionParams.from.value = await getInstalledPackageVersion(
     pkg,
-    packageManager,
-    basePath
+    packageManager
   );
   // Exclude the release of the installed version.
   versionParams.from.excluding = true;
