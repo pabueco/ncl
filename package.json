@@ -10,10 +10,17 @@
     "type": "git",
     "url": "https://github.com/pabueco/ncl.git"
   },
+  "files": [
+    "build",
+    "package.json",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
-    "build": "bun build ./src/index.ts --outdir build --target node"
+    "build": "bun build ./src/index.ts --outdir build --target node",
+    "prepublish": "bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",
