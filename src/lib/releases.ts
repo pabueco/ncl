@@ -23,7 +23,7 @@ export async function loadGitHubReleases(
     const releases =
       await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${repoName}/releases -X GET -f per_page=100 -f page=${page}`.quiet();
 
-    const releasesJson: RawGitHubRelease[] = releases.json();
+    const releasesJson: RawGitHubRelease[] = JSON.parse(releases.stdout);
 
     if (!releasesJson.length) {
       debug(`No more releases found, stopping.`);
