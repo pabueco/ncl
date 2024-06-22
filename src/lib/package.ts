@@ -33,14 +33,11 @@ export async function getInstalledPackageVersion(
 ): Promise<SemVer | null> {
   const version = await (async () => {
     switch (manager) {
+      // `pnpm list` seems to be a bit broken at the moment (9.x), so we use `npm` instead.
+      case "pnpm":
       case "npm": {
         const output = await $`npm ls --depth 0 ${pkg}`.text();
         const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
-        return match?.[1] || null;
-      }
-      case "pnpm": {
-        const output = await $`pnpm ls --depth 0 ${pkg}`.text();
-        const match = output.match(new RegExp(`${pkg} ([^\s]*)`));
         return match?.[1] || null;
       }
       case "yarn": {
@@ -82,7 +79,7 @@ export async function getPackageRepositoryUrl(
       case "yarn":
       case "pnpm":
       case "bun":
-        url = await $`npm view ${pkg} repository.url`.text();
+        url = await $`${manager} view ${pkg} repository.url`.text();
         break;
       case "composer": {
         const info = await $`composer show ${pkg} --no-ansi`.text();
