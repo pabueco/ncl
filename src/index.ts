@@ -28,6 +28,7 @@ const basePath = options.project
 
 // Set the current working directory for all commands.
 $.cwd = basePath;
+$.quiet = true;
 
 console.clear();
 
