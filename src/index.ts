@@ -114,15 +114,19 @@ if (options.source === "changelog") {
   program.setSpinnerText(`Fetching changelog`);
 
   const content = await loadChangelogFile(context.changelogUrl);
-  if (content === null) {
+
+  if (!content && options.source === "changelog") {
     throw program.error(`Failed to load changelog file.`);
   }
-  const changelogReleases = await parseReleasesFromChangelog(
-    content,
-    (version) => versionSatisfiesParams(version, versionParams)
-  );
 
-  releases = changelogReleases ?? [];
+  if (content) {
+    const changelogReleases = await parseReleasesFromChangelog(
+      content,
+      (version) => versionSatisfiesParams(version, versionParams)
+    );
+
+    releases = changelogReleases ?? [];
+  }
 }
 
 // Either the changelog file does not exist it did not contain any releases.
