@@ -215,7 +215,7 @@ let currentReleaseIndex = 0;
 
 async function navigateAndRender(mod = +1) {
   // Prevent clear on first render in debug mode.
-  if (mod !== 0 || !options.debug) {
+  if (mod !== 0 && !options.debug) {
     console.clear();
   }
 
