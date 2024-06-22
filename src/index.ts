@@ -109,12 +109,13 @@ context.changelogUrl =
 debug(context);
 
 // Load releases from changelog file.
-if (options.source === "changelog") {
+if (options.source !== "releases") {
   debug(`Fetching changelog from: ${context.changelogUrl}`);
   program.setSpinnerText(`Fetching changelog`);
 
   const content = await loadChangelogFile(context.changelogUrl);
 
+  // Fail if changelog source was forced, but could't be loaded.
   if (!content && options.source === "changelog") {
     throw program.error(`Failed to load changelog file.`);
   }
@@ -144,6 +145,8 @@ if (!releases.length || options.source === "releases") {
   try {
     releases = await loadGitHubReleases(context.repoName!, versionParams);
   } catch (e) {
+    console.log(e);
+
     throw program.error(`Failed to load GitHub releases.`);
   }
 

@@ -52,9 +52,7 @@ export async function makeProgram() {
       new Option(
         "-s, --source <source>",
         "The source to get version changes from"
-      )
-        .default("changelog")
-        .choices(["changelog", "releases"] as const)
+      ).choices(["changelog", "releases"] as const)
     )
     .addOption(new Option("--debug", "Debug mode"))
     .addArgument(
