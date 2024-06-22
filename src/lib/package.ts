@@ -33,10 +33,21 @@ export async function getInstalledPackageVersion(
 ): Promise<SemVer | null> {
   const version = await (async () => {
     switch (manager) {
-      case "npm":
-      case "yarn":
-      case "pnpm":
-        return await $`${manager} info ${pkg} version`.text();
+      case "npm": {
+        const output = await $`npm ls --depth 0 ${pkg}`.text();
+        const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
+        return match?.[1] || null;
+      }
+      case "pnpm": {
+        const output = await $`pnpm ls --depth 0 ${pkg}`.text();
+        const match = output.match(new RegExp(`${pkg} ([^\s]*)`));
+        return match?.[1] || null;
+      }
+      case "yarn": {
+        const output = await $`yarn list --depth 0 ${pkg}`.text();
+        const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
+        return match?.[1] || null;
+      }
       case "bun": {
         const list = await $`bun pm ls`.text();
         // Must start with a space to avoid matching another package which ends with the same name.
