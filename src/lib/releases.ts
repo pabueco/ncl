@@ -21,7 +21,7 @@ export async function loadGitHubReleases(
     //   await $`gh release list --repo ${repoName} --json name,tagName,isLatest --exclude-pre-releases --exclude-drafts --order desc --limit 100`.quiet();
     // We have to use the API because the CLI does not support paging/offsets.
     const releases =
-      await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${repoName}/releases -X GET -f per_page=100 -f page=${page}`.quiet();
+      await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${repoName}/releases -X GET -f per_page=100 -f page=${page}`;
 
     const releasesJson: RawGitHubRelease[] = JSON.parse(releases.stdout);
 

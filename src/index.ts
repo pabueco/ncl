@@ -165,7 +165,7 @@ if (!releases.length || options.source === "releases") {
   debug(`Trying GitHub releases...`);
   program.setSpinnerText(`Fetching GitHub releases`);
 
-  if (!(await isGitHubCliInstalled())) {
+  if (!hasGitHubCli) {
     throw program.error(
       "GitHub CLI is not installed but required for fetching releases."
     );
