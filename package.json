@@ -3,7 +3,7 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "build/index.mjs"
+    "ncl": "bin/index.ts"
   },
   "version": "0.5.2",
   "repository": {
@@ -11,7 +11,8 @@
     "url": "git+https://github.com/pabueco/ncl.git"
   },
   "files": [
-    "build",
+    "bin",
+    "src",
     "package.json",
     "LICENSE",
     "README.md"
