@@ -3,14 +3,15 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "build/index.js"
+    "ncl": "bin/node.js"
   },
-  "version": "0.6.1",
+  "version": "0.6.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pabueco/ncl.git"
   },
   "files": [
+    "bin",
     "build",
     "package.json",
     "LICENSE",
@@ -19,7 +20,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
-    "build": "bun build ./src/index.ts --outdir build --target bun --minify",
+    "build": "bun build ./src/index.ts --outdir build --target node --minify",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {

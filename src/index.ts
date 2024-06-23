@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 import { $ } from "zx";
 import path from "node:path";
 import semver from "semver";
