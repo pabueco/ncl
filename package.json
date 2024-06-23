@@ -5,7 +5,7 @@
   "bin": {
     "ncl": "build/index.js"
   },
-  "version": "0.5.0",
+  "version": "0.5.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pabueco/ncl.git"
@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
-    "build": "bun build ./src/index.ts --outdir build --target node",
+    "build": "bun build ./src/index.ts --outdir build --target node --minify",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
@@ -41,6 +41,6 @@
     "marked-terminal": "^7.1.0",
     "ora": "^8.0.1",
     "semver": "^7.6.2",
-    "zx": "^8.1.3"
+    "zx": "8.1.2"
   }
 }
