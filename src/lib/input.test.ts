@@ -48,7 +48,7 @@ describe("parsePackageArg", () => {
     );
 
     expect(parsed).toEqual({
-      type: "changelog",
+      type: "changelog-url",
       repoUrl: null,
       repoName: null,
     });

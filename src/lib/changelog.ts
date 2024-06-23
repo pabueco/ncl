@@ -1,7 +1,8 @@
 import { marked } from "marked";
-import type { Release, ReleaseWithTokens } from "../types";
+import type { Context, Release, ReleaseWithTokens } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
+import { $ } from "zx";
 
 export async function loadChangelogFile(url: string): Promise<string | null> {
   const res = await fetch(url);
@@ -71,4 +72,28 @@ export function isChangelogUrl(url: string) {
   // Ends with "changelog" or "changelog.md" or "changelog-<anything>.md" (like "changelog-1.0.md")
   const regex = /changelog(-.*)?(\.md)?$/i;
   return regex.test(url);
+}
+
+export function makeChangelogUrl(context: Context) {
+  return `https://raw.githubusercontent.com/${context.repoName}/${context.branch}/${context.changelogFilePath}`;
+}
+
+/**
+ * Find the path of a changelog file in a GitHub repo.
+ */
+export async function findChangelogFilePathInRepo(
+  context: Context
+): Promise<string | null> {
+  const fileTree =
+    await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${context.repoName}/git/trees/${context.branch}?recursive=1`;
+
+  const files = JSON.parse(fileTree.stdout).tree;
+
+  const changelogItem = files.find((f: any) =>
+    f.path.toLowerCase().includes(`/${context.changelogFilePath}`)
+  );
+
+  if (!changelogItem) return null;
+
+  return changelogItem.path;
 }

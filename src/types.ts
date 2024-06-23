@@ -58,11 +58,13 @@ export type Context = {
     | "package-name"
     | "repo-name"
     | "repo-url"
-    | "changelog"
+    | "changelog-url"
     | null;
   repoUrl: string | null;
   repoName: string | null;
   basePath: string;
   packageManager: PackageManager | null;
   changelogUrl: string | null;
+  changelogFilePath: string;
+  branch: string;
 };

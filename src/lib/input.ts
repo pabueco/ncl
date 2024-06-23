@@ -2,7 +2,7 @@ import { isChangelogUrl } from "./changelog";
 const GITHUB_URL_PREFIX = "https://github.com/";
 
 type ParsedArg = {
-  type: "package-name" | "repo-name" | "repo-url" | "changelog" | null;
+  type: "package-name" | "repo-name" | "repo-url" | "changelog-url" | null;
   repoUrl: string | null;
   repoName: string | null;
 };
@@ -12,7 +12,7 @@ export async function parsePackageArg(
   getPackageRepoUrl: () => Promise<string | null>
 ): Promise<ParsedArg> {
   if (isChangelogUrl(arg)) {
-    return { type: "changelog", repoUrl: null, repoName: null };
+    return { type: "changelog-url", repoUrl: null, repoName: null };
   }
 
   if (isRepoUrl(arg)) {

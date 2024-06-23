@@ -7,7 +7,12 @@ import readline from "readline";
 import { SYMBOLS, KEY_SEQUENCES } from "./constants";
 import type { VersionParams, Release, Context } from "./types";
 import { debug } from "./utils";
-import { loadChangelogFile, parseReleasesFromChangelog } from "./lib/changelog";
+import {
+  findChangelogFilePathInRepo,
+  loadChangelogFile,
+  makeChangelogUrl,
+  parseReleasesFromChangelog,
+} from "./lib/changelog";
 import { loadGitHubReleases, renderRelease } from "./lib/releases";
 import {
   detectPackageManager,
@@ -18,6 +23,7 @@ import { parseVersionParams, versionSatisfiesParams } from "./lib/version";
 import { parsePackageArg } from "./lib/input";
 import chalk from "chalk";
 import { makeProgram } from "./lib/program";
+import { isGitHubCliInstalled } from "./lib/cli";
 
 const program = await makeProgram();
 const options = program.getOptions();
@@ -28,6 +34,7 @@ const basePath = options.project
 
 // Set the current working directory for all commands.
 $.cwd = basePath;
+// Suppresses output for all commands.
 $.quiet = true;
 
 console.clear();
@@ -47,11 +54,12 @@ const context: Context = {
   repoName: null,
   basePath,
   changelogUrl: null,
+  changelogFilePath: options.file.toLowerCase(),
+  branch: options.branch,
 };
 
 program.setSpinnerText(`Parsing arguments`);
 
-// Check if package name is a URL to a raw changelog file.
 const parsedPackageArg = await parsePackageArg(pkg, () => {
   if (!context.packageManager) {
     throw program.error(
@@ -70,7 +78,7 @@ context.repoName = parsedPackageArg.repoName;
 // Parse version range argument.
 let versionParams: VersionParams = parseVersionParams(versionString);
 
-// Load installed version if not provided.
+// Detect installed package version if not provided.
 if (versionParams.type === "range" && !versionParams.from.value) {
   if (!packageManager) {
     throw program.error(
@@ -90,7 +98,7 @@ if (versionParams.type === "range" && !versionParams.from.value) {
 
 debug({ context, versionParams });
 
-if (context.packageArgType !== "changelog") {
+if (context.packageArgType !== "changelog-url") {
   if (!context.repoUrl) {
     throw program.error(`Could not find repository URL for package '${pkg}'`);
   }
@@ -100,12 +108,14 @@ if (context.packageArgType !== "changelog") {
   }
 }
 
+const hasGitHubCli = await isGitHubCliInstalled();
+
 let releases: Release[] = [];
 
 context.changelogUrl =
-  context.packageArgType === "changelog"
+  context.packageArgType === "changelog-url"
     ? context.package
-    : `https://raw.githubusercontent.com/${context.repoName}/${options.branch}/${options.file}`;
+    : makeChangelogUrl(context);
 
 debug(context);
 
@@ -114,7 +124,26 @@ if (options.source !== "releases") {
   debug(`Fetching changelog from: ${context.changelogUrl}`);
   program.setSpinnerText(`Fetching changelog`);
 
-  const content = await loadChangelogFile(context.changelogUrl);
+  let content = await loadChangelogFile(context.changelogUrl);
+
+  const urlWasConstructed = context.packageArgType !== "changelog-url";
+
+  if (!content && urlWasConstructed && hasGitHubCli) {
+    // If we did construct the URL ourselves and didn't find a file,
+    // we try to find the changelog url via the git tree.
+    try {
+      const path = await findChangelogFilePathInRepo(context);
+
+      if (path) {
+        context.changelogFilePath = path;
+        context.changelogUrl = makeChangelogUrl(context);
+
+        content = await loadChangelogFile(context.changelogUrl);
+      }
+    } catch (e) {
+      // Ignore because we'll fail later anyway.
+    }
+  }
 
   // Fail if changelog source was forced, but could't be loaded.
   if (!content && options.source === "changelog") {
@@ -136,8 +165,7 @@ if (!releases.length || options.source === "releases") {
   debug(`Trying GitHub releases...`);
   program.setSpinnerText(`Fetching GitHub releases`);
 
-  const isGithubCliInstalled = await $`gh --version`.quiet();
-  if (isGithubCliInstalled.exitCode !== 0) {
+  if (!(await isGitHubCliInstalled())) {
     throw program.error(
       "GitHub CLI is not installed but required for fetching releases."
     );
@@ -146,9 +174,9 @@ if (!releases.length || options.source === "releases") {
   try {
     releases = await loadGitHubReleases(context.repoName!, versionParams);
   } catch (e) {
-    console.log(e);
-
-    throw program.error(`Failed to load GitHub releases.`);
+    throw program.error(
+      `Failed to load GitHub releases: ${(e as Error).message}`
+    );
   }
 
   debug(`Found ${releases.length} releases.`);
