@@ -79,7 +79,7 @@ export async function getPackageRepositoryUrl(
       case "yarn":
       case "pnpm":
       case "bun":
-        url = await $`${manager} view ${pkg} repository.url`.text();
+        url = await $`npm view ${pkg} repository.url`.text();
         break;
       case "composer": {
         const info = await $`composer show ${pkg} --no-ansi`.text();
