@@ -6,7 +6,7 @@
   "bin": {
     "ncl": "bin/node.js"
   },
-  "version": "0.6.3",
+  "version": "0.6.4",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pabueco/ncl.git"
