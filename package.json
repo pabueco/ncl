@@ -3,9 +3,9 @@
   "module": "src/index.ts",
   "type": "module",
   "bin": {
-    "ncl": "build/index.js"
+    "ncl": "build/index.mjs"
   },
-  "version": "0.5.1",
+  "version": "0.5.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pabueco/ncl.git"
@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "compile": "bun build ./src/index.ts --compile --minify --sourcemap --outfile ./bin/ncl",
-    "build": "bun build ./src/index.ts --outdir build --target node --minify",
+    "build": "bun build ./src/index.ts --outdir build --target node --minify --entry-naming [name].mjs",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
