@@ -3,6 +3,10 @@ import type { Context, Release, ReleaseWithTokens } from "../types";
 import { coerceToSemVer } from "./version";
 import type { SemVer } from "semver";
 import { $ } from "zx";
+import { orderBy } from "lodash-es";
+
+// Ends with "changelog" or "changelog.md" or "changelog-<anything>.md" (like "changelog-1.0.md")
+const CHANGELOG_REGEX = /changelog(-.*)?(\.md)?$/i;
 
 export async function loadChangelogFile(url: string): Promise<string | null> {
   const res = await fetch(url);
@@ -69,31 +73,36 @@ export function isChangelogUrl(url: string) {
     return false;
   }
 
-  // Ends with "changelog" or "changelog.md" or "changelog-<anything>.md" (like "changelog-1.0.md")
-  const regex = /changelog(-.*)?(\.md)?$/i;
-  return regex.test(url);
+  return CHANGELOG_REGEX.test(url);
 }
 
-export function makeChangelogUrl(context: Context) {
-  return `https://raw.githubusercontent.com/${context.repoName}/${context.branch}/${context.changelogFilePath}`;
+export function makeChangelogUrl(context: Context, filePath?: string) {
+  return `https://raw.githubusercontent.com/${context.repoName}/${
+    context.branch
+  }/${filePath || context.changelogFilePath}`;
 }
 
 /**
- * Find the path of a changelog file in a GitHub repo.
+ * Find the paths of all changelog files in a GitHub repo.
+ * Returns them in order: latest -> oldest.
  */
-export async function findChangelogFilePathInRepo(
+export async function findChangelogFilesInRepo(
   context: Context
-): Promise<string | null> {
+): Promise<string[]> {
   const fileTree =
     await $`gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' repos/${context.repoName}/git/trees/${context.branch}?recursive=1`;
 
   const files = JSON.parse(fileTree.stdout).tree;
 
-  const changelogItem = files.find((f: any) =>
-    f.path.toLowerCase().includes(`/${context.changelogFilePath}`)
+  const paths: string[] = files
+    .filter((f: any) => CHANGELOG_REGEX.test(f.path))
+    .map((f: any) => f.path);
+
+  // Sort by path length. Longer paths indicate older changelogs, so they should come later.
+  // E.g. https://github.com/vuejs/core/tree/main/changelogs
+  return orderBy(
+    paths,
+    [(path) => path.length, (path) => path],
+    ["asc", "desc"]
   );
-
-  if (!changelogItem) return null;
-
-  return changelogItem.path;
 }

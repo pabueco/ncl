@@ -64,7 +64,10 @@ export async function makeProgram() {
     .addArgument(new Argument("[<version-range>]", "The version range to load"))
     .parseAsync(process.argv);
 
-  const spinner = ora("Initializing").start();
+  const spinner = ora({
+    // discardStdin: true,
+    text: "Initializing",
+  }).start();
 
   const error = (message: string) => {
     spinner.stop();

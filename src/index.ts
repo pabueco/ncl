@@ -8,7 +8,7 @@ import { SYMBOLS, KEY_SEQUENCES } from "./constants";
 import type { VersionParams, Release, Context } from "./types";
 import { debug } from "./utils";
 import {
-  findChangelogFilePathInRepo,
+  findChangelogFilesInRepo,
   loadChangelogFile,
   makeChangelogUrl,
   parseReleasesFromChangelog,
@@ -131,14 +131,22 @@ if (options.source !== "releases") {
   if (!content && urlWasConstructed && hasGitHubCli) {
     // If we did construct the URL ourselves and didn't find a file,
     // we try to find the changelog url via the git tree.
+
+    program.setSpinnerText(`Searching for changelog files in repo`);
+
     try {
-      const path = await findChangelogFilePathInRepo(context);
+      const paths = await findChangelogFilesInRepo(context);
 
-      if (path) {
-        context.changelogFilePath = path;
-        context.changelogUrl = makeChangelogUrl(context);
+      program.setSpinnerText(`Loading ${paths.length} changelog files`);
 
-        content = await loadChangelogFile(context.changelogUrl);
+      if (paths?.length) {
+        const contents = await Promise.all(
+          paths.map((path) => {
+            const url = makeChangelogUrl(context, path);
+            return loadChangelogFile(url);
+          })
+        );
+        content = contents.join("\n\n");
       }
     } catch (e) {
       // Ignore because we'll fail later anyway.
@@ -151,6 +159,7 @@ if (options.source !== "releases") {
   }
 
   if (content) {
+    program.setSpinnerText(`Parsing changelog`);
     const changelogReleases = await parseReleasesFromChangelog(
       content,
       (version) => versionSatisfiesParams(version, versionParams)
