@@ -14,15 +14,15 @@ You can work around unsupported package managers by providing the repository nam
 
 ## Installation
 
-Currently `ncl` only supports [Bun](https://bun.sh/). You cannot run it with plain Node (e.g. `npx`).
+You can easily run `ncl` via `npx` (or alternatives like `bunx`, `pnpx` and `yarn dlx`):
 
 ```sh
 # Run it directly
-bunx @pabueco/ncl <args>
+npx @pabueco/ncl <args>
 
-# or install it globally to remove the need for the scope:
-bun i -g @pabueco/ncl
-bunx ncl <args>
+# or install it globally:
+npm i -g @pabueco/ncl
+ncl <args>
 ```
 
 > [!NOTE]  
