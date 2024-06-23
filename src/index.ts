@@ -1,10 +1,14 @@
-import { $ } from "zx";
 import path from "node:path";
+import readline from "node:readline";
+import { $ } from "zx";
 import semver from "semver";
 import { marked, type Token } from "marked";
 import { markedTerminal } from "marked-terminal";
-import readline from "readline";
-import { SYMBOLS, KEY_SEQUENCES } from "./constants";
+import {
+  SYMBOLS,
+  KEY_SEQUENCES,
+  DEFAULT_CHANGELOG_FILENAME,
+} from "./constants";
 import type { VersionParams, Release, Context } from "./types";
 import { debug } from "./utils";
 import {
@@ -54,7 +58,7 @@ const context: Context = {
   repoName: null,
   basePath,
   changelogUrl: null,
-  changelogFilePath: options.file.toLowerCase(),
+  changelogFilePath: options.file?.toLowerCase() || DEFAULT_CHANGELOG_FILENAME,
   branch: options.branch,
 };
 
@@ -96,8 +100,6 @@ if (versionParams.type === "range" && !versionParams.from.value) {
   versionParams.from.excluding = true;
 }
 
-debug({ context, versionParams });
-
 if (context.packageArgType !== "changelog-url") {
   if (!context.repoUrl) {
     throw program.error(`Could not find repository URL for package '${pkg}'`);
@@ -117,61 +119,51 @@ context.changelogUrl =
     ? context.package
     : makeChangelogUrl(context);
 
-debug(context);
-
 // Load releases from changelog file.
 if (options.source !== "releases") {
-  debug(`Fetching changelog from: ${context.changelogUrl}`);
   program.setSpinnerText(`Fetching changelog`);
 
-  let content = await loadChangelogFile(context.changelogUrl);
+  let urls = new Set([context.changelogUrl]);
 
-  const urlWasConstructed = context.packageArgType !== "changelog-url";
-
-  if (!content && urlWasConstructed && hasGitHubCli) {
-    // If we did construct the URL ourselves and didn't find a file,
-    // we try to find the changelog url via the git tree.
-
+  if (
+    // URL was constructed automatically and not supplied by the user.
+    context.packageArgType !== "changelog-url" &&
+    hasGitHubCli
+  ) {
+    // Try to find all changelog files via the git tree.
     program.setSpinnerText(`Searching for changelog files in repo`);
 
-    try {
-      const paths = await findChangelogFilesInRepo(context);
-
-      program.setSpinnerText(`Loading ${paths.length} changelog files`);
-
-      if (paths?.length) {
-        const contents = await Promise.all(
-          paths.map((path) => {
-            const url = makeChangelogUrl(context, path);
-            return loadChangelogFile(url);
-          })
-        );
-        content = contents.join("\n\n");
-      }
-    } catch (e) {
-      // Ignore because we'll fail later anyway.
-    }
+    const paths = await findChangelogFilesInRepo(context);
+    paths
+      .map((path) => makeChangelogUrl(context, path))
+      .forEach((path) => urls.add(path));
   }
+
+  program.setSpinnerText(`Loading ${urls.size} changelog files`);
+
+  releases = (
+    await Promise.all(
+      Array.from(urls).map(async (url) => {
+        const content = await loadChangelogFile(url);
+        if (!content) return [];
+
+        return await parseReleasesFromChangelog(content, (version) =>
+          versionSatisfiesParams(version, versionParams)
+        );
+      })
+    )
+  ).flat();
 
   // Fail if changelog source was forced, but could't be loaded.
-  if (!content && options.source === "changelog") {
-    throw program.error(`Failed to load changelog file.`);
-  }
-
-  if (content) {
-    program.setSpinnerText(`Parsing changelog`);
-    const changelogReleases = await parseReleasesFromChangelog(
-      content,
-      (version) => versionSatisfiesParams(version, versionParams)
+  if (!releases.length && options.source === "changelog") {
+    throw program.error(
+      `Failed to load changelog file or not matching releases found.`
     );
-
-    releases = changelogReleases ?? [];
   }
 }
 
 // Either the changelog file does not exist it did not contain any releases.
 if (!releases.length || options.source === "releases") {
-  debug(`Trying GitHub releases...`);
   program.setSpinnerText(`Fetching GitHub releases`);
 
   if (!hasGitHubCli) {
@@ -187,8 +179,6 @@ if (!releases.length || options.source === "releases") {
       `Failed to load GitHub releases: ${(e as Error).message}`
     );
   }
-
-  debug(`Found ${releases.length} releases.`);
 }
 
 // Default is by date (= order the releases appear in), so we only need to sort by version.

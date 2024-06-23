@@ -13,14 +13,15 @@ export async function detectPackageManager(
     "pnpm-lock.yaml": "pnpm",
     "bun.lockb": "bun",
     "composer.json": "composer",
-    "Cargo.toml": "cargo",
+    "cargo.toml": "cargo",
   };
 
   const files = await globby("*", { cwd: basePath, onlyFiles: true });
 
   for (const file of files) {
-    if (managerByFile[file]) {
-      return managerByFile[file];
+    const name = file.toLowerCase();
+    if (managerByFile[name]) {
+      return managerByFile[name];
     }
   }
 

@@ -33,10 +33,7 @@ export async function makeProgram() {
       ).default("main")
     )
     .addOption(
-      new Option(
-        "-f, --file <branch>",
-        "The filename of the changelog file"
-      ).default("CHANGELOG.md")
+      new Option("-f, --file <branch>", "The filename of the changelog file")
     )
     .addOption(
       new Option("-o, --order-by <field>", "The field to order releases by")

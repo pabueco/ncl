@@ -20,3 +20,5 @@ export const SYMBOLS = {
 export const KEY_SEQUENCES = {
   CtrlC: "\u0003",
 };
+
+export const DEFAULT_CHANGELOG_FILENAME = "CHANGELOG.md";

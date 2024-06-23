@@ -65,6 +65,6 @@ export type Context = {
   basePath: string;
   packageManager: PackageManager | null;
   changelogUrl: string | null;
-  changelogFilePath: string;
+  changelogFilePath: string | null;
   branch: string;
 };
