@@ -1,5 +1,6 @@
 {
   "name": "@pabueco/ncl",
+  "description": "Explore the changelog of dependencies and repositories in a nice way.",
   "module": "src/index.ts",
   "type": "module",
   "bin": {
