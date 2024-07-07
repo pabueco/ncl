@@ -1,12 +1,24 @@
 {
   "name": "@pabueco/ncl",
   "description": "Explore the changelog of dependencies and repositories in a nice way.",
+  "keywords": [
+    "changelog",
+    "changes",
+    "breaking",
+    "viewer",
+    "nice",
+    "releases",
+    "upgrade",
+    "update",
+    "dependencies"
+  ],
   "module": "src/index.ts",
   "type": "module",
   "bin": {
     "ncl": "bin/node.js"
   },
   "version": "0.6.5",
+  "author": "pabueco",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pabueco/ncl.git"
