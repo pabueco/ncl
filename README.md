@@ -30,6 +30,8 @@ ncl <args>
 
 ## Usage
 
+`<pkg>` can be any dependency name (like `vue`) when you are running `ncl` inside a project directory using one of the supported package managers. When running it in any other directory `<pkg>` needs to be the full name (or URL) of a GitHub repository (like `vuejs/core`, `https://github.com/vuejs/core`) or the URL of a changelog markdown file (like `https://github.com/vuejs/core/blob/main/CHANGELOG.md`).
+
 ```sh
 # Basic fingerprint:
 ncl <package> [<version-or-range>]
