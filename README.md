@@ -49,6 +49,9 @@ ncl <pkg> 3.5
 # All versions from 4
 ncl <pkg> 4..
 
+# All versions
+ncl <pkg> all
+
 # You can also use more complex semver ranges, but they need to be escaped in most terminals:
 ncl <pkg> "\>2.3 \<=2.8"
 ```

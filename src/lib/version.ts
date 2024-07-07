@@ -67,7 +67,7 @@ export function versionSatisfiesParams(
 }
 
 export function parseVersionParams(versionString?: string): VersionParams {
-  if (!versionString) {
+  if (!versionString || versionString === "all") {
     return {
       from: {
         value: null,
