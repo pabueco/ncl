@@ -67,10 +67,11 @@ export function versionSatisfiesParams(
 }
 
 export function parseVersionParams(versionString?: string): VersionParams {
-  if (!versionString || versionString === "all") {
+  const showAll = versionString === "all";
+  if (!versionString || showAll) {
     return {
       from: {
-        value: null,
+        value: showAll ? coerceToSemVer("0.x") : null,
       },
       to: {
         value: null,
