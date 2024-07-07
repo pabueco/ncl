@@ -31,7 +31,7 @@
     "@types/semver": "^7.5.8"
   },
   "peerDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.5.2"
   },
   "dependencies": {
     "@commander-js/extra-typings": "^12.1.0",
