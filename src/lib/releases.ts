@@ -60,7 +60,7 @@ export async function loadGitHubReleases(
     .map((r) => ({
       version:
         findValidVersionInStrings([r.tag_name, r.name])?.toString() || "",
-      content: r.body as string,
+      content: (r.body as string).replaceAll("&nbsp;", " "),
       url: r.html_url,
       date: format(new Date(r.published_at), "yyyy-MM-dd"),
     }))
