@@ -33,35 +33,40 @@ export async function getInstalledPackageVersion(
   manager: PackageManager
 ): Promise<SemVer | null> {
   const version = await (async () => {
-    switch (manager) {
-      // `pnpm list` seems to be a bit broken at the moment (9.x), so we use `npm` instead.
-      case "pnpm":
-      case "npm": {
-        const output = await $`npm ls --depth 0 ${pkg}`.text();
-        const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
-        return match?.[1] || null;
+    try {
+      switch (manager) {
+        // `pnpm list` seems to be a bit broken at the moment (9.x), so we use `npm` instead.
+        case "pnpm":
+        case "npm": {
+          const output = await $`npm ls --depth 0 ${pkg}`.text();
+          const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
+          return match?.[1] || null;
+        }
+        case "yarn": {
+          const output = await $`yarn list --depth 0 ${pkg}`.text();
+          const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
+          return match?.[1] || null;
+        }
+        case "bun": {
+          const list = await $`bun pm ls`.text();
+          // Must start with a space to avoid matching another package which ends with the same name.
+          const match = list.match(new RegExp(` ${pkg}@(.*)`));
+          return match?.[1] || null;
+        }
+        case "composer": {
+          const info = await $`composer show ${pkg} --no-ansi`.text();
+          const match = info.match(/versions[ \t]+: \* (.*)/);
+          return match?.[1] || null;
+        }
+        case "cargo": {
+          const info = await $`cargo metadata`.json();
+          const dep = info.packages.find((p: any) => p.name === pkg);
+          return dep?.version || null;
+        }
       }
-      case "yarn": {
-        const output = await $`yarn list --depth 0 ${pkg}`.text();
-        const match = output.match(new RegExp(` ${pkg}@([^\s]*)`));
-        return match?.[1] || null;
-      }
-      case "bun": {
-        const list = await $`bun pm ls`.text();
-        // Must start with a space to avoid matching another package which ends with the same name.
-        const match = list.match(new RegExp(` ${pkg}@(.*)`));
-        return match?.[1] || null;
-      }
-      case "composer": {
-        const info = await $`composer show ${pkg} --no-ansi`.text();
-        const match = info.match(/versions[ \t]+: \* (.*)/);
-        return match?.[1] || null;
-      }
-      case "cargo": {
-        const info = await $`cargo metadata`.json();
-        const dep = info.packages.find((p: any) => p.name === pkg);
-        return dep?.version || null;
-      }
+    } catch (e) {
+      debug("Failed to detect installed package version");
+      return null;
     }
   })();
 
@@ -95,8 +100,9 @@ export async function getPackageRepositoryUrl(
       }
     }
   } catch (e) {
-    // console.error(e);
+    debug("Failed to find repository URL");
     // We want to support getting changelogs without being in an actual project.
+    // i.e. just opening the terminal and checking the changelog for some repo.
   }
 
   // Remove git+ and .git from the URL
@@ -107,7 +113,7 @@ export async function getPackageRepositoryUrl(
 
   if (url) return url;
 
-  debug(`Could not detect repository URL, trying package name.`);
+  debug(`Could not detect repository URL, trying package name`);
 
   const maybeUrl = `https://github.com/${pkg}`;
   const res = await fetch(maybeUrl);

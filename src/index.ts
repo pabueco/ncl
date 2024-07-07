@@ -133,10 +133,14 @@ if (options.source !== "releases") {
     // Try to find all changelog files via the git tree.
     program.setSpinnerText(`Searching for changelog files in repo`);
 
-    const paths = await findChangelogFilesInRepo(context);
-    paths
-      .map((path) => makeChangelogUrl(context, path))
-      .forEach((path) => urls.add(path));
+    try {
+      const paths = await findChangelogFilesInRepo(context);
+      paths
+        .map((path) => makeChangelogUrl(context, path))
+        .forEach((path) => urls.add(path));
+    } catch (e) {
+      debug("Failed to find changelog files in repository");
+    }
   }
 
   program.setSpinnerText(`Loading ${urls.size} changelog files`);

@@ -61,6 +61,8 @@ export async function makeProgram() {
     .addArgument(new Argument("[<version-range>]", "The version range to load"))
     .parseAsync(process.argv);
 
+  process.env.DEBUG = program.opts().debug ? "1" : "0";
+
   const spinner = ora({
     // discardStdin: true,
     text: "Initializing",

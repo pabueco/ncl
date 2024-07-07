@@ -1,4 +1,4 @@
-import { describe, it, expect, mock } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { isChangelogUrl, parseReleasesFromChangelog } from "./changelog";
 import { renderRelease } from "./releases";
 import { marked } from "marked";
