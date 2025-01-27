@@ -268,7 +268,7 @@ async function navigateAndRender(mod = +1) {
     currentRelease.version
   )}${datePart} | ${versionRangePart}`;
 
-  const footer = `[${SYMBOLS.ArrowLeft}|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|Ctrl+C] Quit\n`;
+  const footer = `[${SYMBOLS.ArrowLeft}|a|k] Previous   [${SYMBOLS.ArrowRight}|d|j] Next   [q|ctrl+c] Quit\n`;
 
   console.log(header + "\n");
 

@@ -12,6 +12,7 @@ export async function detectPackageManager(
     "package-lock.json": "npm",
     "pnpm-lock.yaml": "pnpm",
     "bun.lockb": "bun",
+    "bun.lock": "bun",
     "composer.json": "composer",
     "cargo.toml": "cargo",
   };
